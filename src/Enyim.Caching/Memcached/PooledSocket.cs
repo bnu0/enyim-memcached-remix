@@ -26,9 +26,8 @@ namespace Enyim.Caching.Memcached
 
         private NetworkStream _inputStream;
         private SslStream _sslStream;
-        private readonly string _sslTargetHost;
 
-        public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6, bool useSslClientAuth)
+        public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6)
         {
             _endpoint = endpoint;
             _logger = logger;
@@ -36,12 +35,6 @@ namespace Enyim.Caching.Memcached
             _useSslStream = useSslStream;
             _useIPv6 = useIPv6;
             
-
-            if (_useSslStream && useSslClientAuth)
-            {
-                _sslTargetHost = ((DnsEndPoint)_endpoint).Host;
-            }
-
             var socket = new Socket(useIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             socket.NoDelay = true;
@@ -104,8 +97,8 @@ namespace Enyim.Caching.Memcached
             {
                 if (_useSslStream)
                 {
-                    _sslStream = new SslStream(new NetworkStream(_socket));
-                    _sslStream.AuthenticateAsClient(_sslTargetHost);
+                    _sslStream = new SslStream(new NetworkStream(_socket), false, (s,c,h,e) => true);
+                    _sslStream.AuthenticateAsClient(_endpoint.ToString());
                 }
                 else
                 {
@@ -164,7 +157,7 @@ namespace Enyim.Caching.Memcached
                 if (_useSslStream)
                 {
                     _sslStream = new SslStream(new NetworkStream(_socket));
-                    await _sslStream.AuthenticateAsClientAsync(_sslTargetHost);
+                    await _sslStream.AuthenticateAsClientAsync(_endpoint.ToString());
                 }
                 else
                 {

@@ -48,8 +48,6 @@ namespace Enyim.Caching.Configuration
         bool UseIPv6 { get; }
 
         bool SuppressException { get; }
-
-        bool UseSslClientAuth { get; }
     }
 }
 

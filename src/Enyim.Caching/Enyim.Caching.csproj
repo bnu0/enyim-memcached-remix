@@ -1,35 +1,38 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Description>forking the core fork of enyim memcached to make it work on framework again</Description>
+		<Authors>cnblogs.com</Authors>
+		<TargetFrameworks>net48;net8.0</TargetFrameworks>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<AssemblyName>EnyimMemcachedRemix</AssemblyName>
+		<PackageVersion>420.0.0</PackageVersion>
+		<PackageId>EnyimMemcachedRemix</PackageId>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageTags>memcached;cache</PackageTags>
+		<PackageProjectUrl>https://github.com/bnu0/enyim-memcached-remix</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/bnu0/enyim-memcached-remix</RepositoryUrl>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+		<LangVersion>latest</LangVersion>
+		<NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <Description>EnyimMemcachedCore is a Memcached client library for .NET. Add services.AddEnyimMemcached() in Startup. Inject IMemcachedClient into constructors.</Description>
-    <Authors>cnblogs.com</Authors>
-    <TargetFramework>net48</TargetFramework>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyName>EnyimMemcachedCore</AssemblyName>
-    <PackageId>EnyimMemcachedCore</PackageId>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>memcached;cache</PackageTags>
-    <PackageProjectUrl>https://github.com/cnblogs/EnyimMemcachedCore</PackageProjectUrl>
-    <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/cnblogs/EnyimMemcachedCore</RepositoryUrl>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
-    <LangVersion>latest</LangVersion>
-    <NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
-  </PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
+	</ItemGroup>
 
-  <ItemGroup>
-      <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
-      <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-  </ItemGroup>
+	<ItemGroup Condition=" '$(TargetFramework)' == 'net48' ">
+		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MessagePack" Version="2.5.140" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="MessagePack" Version="2.5.140" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="../../README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
 </Project>
