@@ -27,8 +27,8 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
             ILogger logger,
             bool useSslStream,
             bool useIPv6,
-            SslClientAuthenticationOptions sslClientAuthOptions)
-            : base(endpoint, config, logger, useSslStream, useIPv6, sslClientAuthOptions)
+            bool useSslClientAuth)
+            : base(endpoint, config, logger, useSslStream, useIPv6, useSslClientAuth)
         {
             _authenticationProvider = authenticationProvider;
             _logger = logger;

@@ -3,7 +3,6 @@ using Enyim.Caching.Memcached;
 using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached.Results.Extensions;
 using Enyim.Caching.Memcached.Results.Factories;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -16,7 +15,7 @@ namespace Enyim.Caching
     /// <summary>
     /// Memcached client.
     /// </summary>
-    public partial class MemcachedClient : IMemcachedClient, IMemcachedResultsClient, IDistributedCache
+    public partial class MemcachedClient : IMemcachedClient, IMemcachedResultsClient
     {
         /// <summary>
         /// Represents a value which indicates that an item should never expire.

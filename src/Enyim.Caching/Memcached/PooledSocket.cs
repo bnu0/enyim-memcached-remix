@@ -26,24 +26,20 @@ namespace Enyim.Caching.Memcached
 
         private NetworkStream _inputStream;
         private SslStream _sslStream;
-        private readonly SslClientAuthenticationOptions _sslClientAuthOptions;
+        private readonly string _sslTargetHost;
 
-        public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6, SslClientAuthenticationOptions sslClientAuthOptions)
+        public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6, bool useSslClientAuth)
         {
             _endpoint = endpoint;
             _logger = logger;
             _isAlive = true;
             _useSslStream = useSslStream;
             _useIPv6 = useIPv6;
-            _sslClientAuthOptions = sslClientAuthOptions;
+            
 
-            if (_useSslStream && _sslClientAuthOptions == null)
+            if (_useSslStream && useSslClientAuth)
             {
-                // When not provided, create a default instance with target host set to the endpoint's host
-                _sslClientAuthOptions = new SslClientAuthenticationOptions
-                {
-                    TargetHost = ((DnsEndPoint)_endpoint).Host,
-                };
+                _sslTargetHost = ((DnsEndPoint)_endpoint).Host;
             }
 
             var socket = new Socket(useIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -109,7 +105,7 @@ namespace Enyim.Caching.Memcached
                 if (_useSslStream)
                 {
                     _sslStream = new SslStream(new NetworkStream(_socket));
-                    _sslStream.AuthenticateAsClient(_sslClientAuthOptions);
+                    _sslStream.AuthenticateAsClient(_sslTargetHost);
                 }
                 else
                 {
@@ -168,7 +164,7 @@ namespace Enyim.Caching.Memcached
                 if (_useSslStream)
                 {
                     _sslStream = new SslStream(new NetworkStream(_socket));
-                    await _sslStream.AuthenticateAsClientAsync(_sslClientAuthOptions);
+                    await _sslStream.AuthenticateAsClientAsync(_sslTargetHost);
                 }
                 else
                 {

@@ -38,7 +38,7 @@ namespace Enyim.Caching.Memcached
         private readonly TimeSpan _initPoolTimeout;
         private bool _useSslStream;
         private bool _useIPv6;
-        private readonly SslClientAuthenticationOptions _sslClientAuthOptions;
+        private readonly bool _useSslClientAuth;
 
         public MemcachedNode(
             EndPoint endpoint,
@@ -46,11 +46,11 @@ namespace Enyim.Caching.Memcached
             ILogger logger,
             bool useSslStream,
             bool useIPv6,
-            SslClientAuthenticationOptions sslClientAuthOptions)
+            bool useSslClientAuth)
         {
             _endPoint = endpoint;
             _useSslStream = useSslStream;
-            _sslClientAuthOptions = sslClientAuthOptions;
+            _useSslClientAuth = useSslClientAuth;
             EndPointString = endpoint?.ToString().Replace("Unspecified/", string.Empty);
             _config = socketPoolConfig;
 
@@ -863,7 +863,7 @@ namespace Enyim.Caching.Memcached
         {
             try
             {
-                var ps = new PooledSocket(_endPoint, _config.ConnectionTimeout, _config.ReceiveTimeout, _logger, _useSslStream, _useIPv6, _sslClientAuthOptions);
+                var ps = new PooledSocket(_endPoint, _config.ConnectionTimeout, _config.ReceiveTimeout, _logger, _useSslStream, _useIPv6, _useSslClientAuth);
                 ps.Connect();
                 return ps;
             }
@@ -879,7 +879,7 @@ namespace Enyim.Caching.Memcached
         {
             try
             {
-                var ps = new PooledSocket(_endPoint, _config.ConnectionTimeout, _config.ReceiveTimeout, _logger, _useSslStream, _useIPv6, _sslClientAuthOptions);
+                var ps = new PooledSocket(_endPoint, _config.ConnectionTimeout, _config.ReceiveTimeout, _logger, _useSslStream, _useIPv6, _useSslClientAuth);
                 await ps.ConnectAsync();
                 return ps;
             }

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Description>EnyimMemcachedCore is a Memcached client library for .NET. Add services.AddEnyimMemcached() in Startup. Inject IMemcachedClient into constructors.</Description>
     <Authors>cnblogs.com</Authors>
-    <TargetFrameworks>net6.0;net7.0;net8.0</TargetFrameworks>
+    <TargetFramework>net48</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>EnyimMemcachedCore</AssemblyName>
     <PackageId>EnyimMemcachedCore</PackageId>
@@ -19,8 +19,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-      <FrameworkReference Include="Microsoft.AspNetCore.App" />
       <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Options" Version="1.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="1.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>

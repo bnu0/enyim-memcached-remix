@@ -28,7 +28,7 @@ namespace Enyim.Caching.Configuration
 
         public bool SuppressException { get; set; } = true;
 
-        public SslClientAuthenticationOptions SslClientAuth { get; set; }
+        public bool UseSslClientAuth { get; set; }
 
         public IProviderFactory<IMemcachedNodeLocator> NodeLocatorFactory { get; set; }
 

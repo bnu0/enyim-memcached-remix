@@ -49,7 +49,7 @@ namespace Enyim.Caching.Configuration
 
         bool SuppressException { get; }
 
-        SslClientAuthenticationOptions SslClientAuth { get; }
+        bool UseSslClientAuth { get; }
     }
 }
 
