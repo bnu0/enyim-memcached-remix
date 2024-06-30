@@ -5,7 +5,7 @@
 		<TargetFrameworks>net48;net8.0</TargetFrameworks>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<AssemblyName>EnyimMemcachedRemix</AssemblyName>
-		<PackageVersion>420.0.0</PackageVersion>
+		<PackageVersion>420.0.1</PackageVersion>
 		<PackageId>EnyimMemcachedRemix</PackageId>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>memcached;cache</PackageTags>
@@ -16,6 +16,8 @@
 		<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
 		<LangVersion>latest</LangVersion>
 		<NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>C:\Users\bnu\Desktop\Toptix.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 
 	<ItemGroup>
