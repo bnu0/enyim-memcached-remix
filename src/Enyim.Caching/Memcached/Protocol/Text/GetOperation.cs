@@ -12,7 +12,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override System.Collections.Generic.IList<System.ArraySegment<byte>> GetBuffer()
         {
-            var command = "get " + Key + TextSocketHelper.CommandTerminator;
+            var command = "gets " + Key + TextSocketHelper.CommandTerminator;
 
             return TextSocketHelper.GetCommandBuffer(command);
         }

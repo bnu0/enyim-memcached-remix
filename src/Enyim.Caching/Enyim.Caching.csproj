@@ -5,7 +5,7 @@
 		<TargetFrameworks>net48;net8.0</TargetFrameworks>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<AssemblyName>EnyimMemcachedRemix</AssemblyName>
-		<PackageVersion>420.0.1</PackageVersion>
+		<PackageVersion>420.0.3</PackageVersion>
 		<PackageId>EnyimMemcachedRemix</PackageId>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>memcached;cache</PackageTags>
