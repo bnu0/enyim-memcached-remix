@@ -474,7 +474,7 @@ namespace Enyim.Caching.Memcached
                 {
                     foreach (var buf in buffers)
                     {
-                        _sslStream.Write(buf.Array);
+                        _sslStream.Write(buf.Array, buf.Offset, buf.Count);
                     }
                     _sslStream.Flush();
                 }
@@ -509,7 +509,7 @@ namespace Enyim.Caching.Memcached
                 {
                     foreach (var buf in buffers)
                     {
-                        await _sslStream.WriteAsync(buf.Array, 0, buf.Count);
+                        await _sslStream.WriteAsync(buf.Array, buf.Offset, buf.Count);
                     }
                     await _sslStream.FlushAsync();
                 }
