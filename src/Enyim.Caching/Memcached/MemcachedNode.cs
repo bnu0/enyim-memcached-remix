@@ -535,7 +535,7 @@ namespace Enyim.Caching.Memcached
                     _semaphore.Release();
 
                     MarkAsDead();
-                    result.Fail(message);
+                    result.Fail(message, e);
                     return result;
                 }
 
