@@ -68,8 +68,9 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             {
                 data = socket.ReadByte();
 
-                if (data == -1)
+                if (data == -1) // EOF / half-open → kill this socket
                 {
+                    socket.IsAlive = false;
                     return string.Empty;
                 }
 
