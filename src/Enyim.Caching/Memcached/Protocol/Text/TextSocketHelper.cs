@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
@@ -57,48 +58,48 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
         {
-            var ms = new MemoryStream(50);
-
-            bool gotR = false;
-            //byte[] buffer = new byte[1];
-
-            int data;
-
-            while (true)
+            using (var ms = new SegmentedMemoryStream(1024))
             {
-                data = socket.ReadByte();
+                bool gotR = false;
 
-                if (data == -1) // EOF / half-open → kill this socket
+                int data;
+
+                while (true)
                 {
-                    socket.IsAlive = false;
-                    return string.Empty;
+                    data = socket.ReadByte();
+
+                    if (data == -1) // EOF / half-open → kill this socket
+                    {
+                        socket.IsAlive = false;
+                        return string.Empty;
+                    }
+
+                    if (data == 13)
+                    {
+                        gotR = true;
+                        continue;
+                    }
+
+                    if (gotR)
+                    {
+                        if (data == 10)
+                            break;
+
+                        ms.WriteByte(13);
+
+                        gotR = false;
+                    }
+
+                    ms.WriteByte((byte) data);
                 }
 
-                if (data == 13)
-                {
-                    gotR = true;
-                    continue;
-                }
+                string retval = ms.ConvertToAscii();
 
-                if (gotR)
-                {
-                    if (data == 10)
-                        break;
+                if (log.IsDebugEnabled)
+                    log.Debug("ReadLine: " + retval);
 
-                    ms.WriteByte(13);
-
-                    gotR = false;
-                }
-
-                ms.WriteByte((byte)data);
+                return retval;
             }
-
-            string retval = Encoding.ASCII.GetString(ms.ToArray(), 0, (int)ms.Length);
-
-            if (log.IsDebugEnabled)
-                log.Debug("ReadLine: " + retval);
-
-            return retval;
         }
 
         /// <summary>
