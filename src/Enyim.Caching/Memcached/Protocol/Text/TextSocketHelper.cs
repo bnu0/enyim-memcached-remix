@@ -3,14 +3,18 @@ using System.Buffers;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
     internal static class TextSocketHelper
     {
         private const string GenericErrorResponse = "ERROR";
+        private static byte[] GenericErrorResponseBytes = Encoding.ASCII.GetBytes(GenericErrorResponse);
         private const string ClientErrorResponse = "CLIENT_ERROR ";
+        private static byte[] ClientErrorResponseBytes = Encoding.ASCII.GetBytes(ClientErrorResponse);
         private const string ServerErrorResponse = "SERVER_ERROR ";
+        private static byte[] ServerErrorResponseBytes = Encoding.ASCII.GetBytes(ServerErrorResponse);
         private const int ErrorResponseLength = 13;
 
         public const string CommandTerminator = "\r\n";
@@ -27,6 +31,10 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         public static string ReadResponse(PooledSocket socket)
         {
             string response = TextSocketHelper.ReadLine(socket);
+            if (response == null)
+            {
+                return string.Empty;
+            }
 
             if (log.IsDebugEnabled)
                 log.Debug("Received response: " + response);
@@ -51,55 +59,117 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
             return response;
         }
+        
+        public static (string[], int) ReadResponseParts(PooledSocket socket)
+        {
+            var ms = ReadSocketContet(socket);
+            if (ms == null)
+            {
+                return (Array.Empty<string>(), 0);
+            }
+
+            var buff = ArrayPool<byte>.Shared.Rent(ms.Length);
+            buff = ms.ToArray(buff);
+
+            if (log.IsDebugEnabled)
+                log.Debug("Received response: " + Encoding.ASCII.GetString(buff, 0, ms.Length));
+
+            if (buff.Length == 0)
+                throw new MemcachedClientException("Empty response received.");
+
+            if (buff.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
+                throw new NotSupportedException("Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
+
+            if (buff.Length >= ErrorResponseLength)
+            {
+                if (buff.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
+                {
+                    throw new MemcachedClientException(Encoding.ASCII.GetString(buff, ErrorResponseLength, ms.Length - ErrorResponseLength));
+                }
+                else if (buff.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
+                {
+                    throw new MemcachedException(Encoding.ASCII.GetString(buff,0, ErrorResponseLength));
+                }
+            }
+
+            var lastIndex = 0;
+            var currIndex = 0;
+            var partCount = 0;
+            var ret = new string[5];
+            for (var i = 0; i < ms.Length; i++)
+            {
+                if (buff[i] == 0x20) // ascii blank space
+                {
+                    ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, currIndex - lastIndex);
+                    partCount++;
+                    lastIndex = currIndex + 1;
+                }
+                currIndex++;
+            }
+
+            if (partCount == 0 && ms.Length > 0)
+            {
+                ret[0] = Encoding.ASCII.GetString(buff, 0, ms.Length);
+                partCount = 1;
+            }
+            
+            ArrayPool<byte>.Shared.Return(buff);
+
+            return (ret, partCount);
+        }
 
         /// <summary>
         /// Reads a line from the socket. A line is terninated by \r\n.
         /// </summary>
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
+        { 
+            var ms = ReadSocketContet(socket);
+            string retval = ms.ConvertToAscii();
+            if (log.IsDebugEnabled)
+                log.Debug("ReadLine: " + retval);
+
+            return retval;
+        }
+
+        private static SegmentedMemoryStream ReadSocketContet(PooledSocket socket)
         {
-            using (var ms = new SegmentedMemoryStream(1024))
+            var ms = new SegmentedMemoryStream(1024);
+
+            bool gotR = false;
+
+            int data;
+
+            while (true)
             {
-                bool gotR = false;
+                data = socket.ReadByte();
 
-                int data;
-
-                while (true)
+                if (data == -1) // EOF / half-open → kill this socket
                 {
-                    data = socket.ReadByte();
-
-                    if (data == -1) // EOF / half-open → kill this socket
-                    {
-                        socket.IsAlive = false;
-                        return string.Empty;
-                    }
-
-                    if (data == 13)
-                    {
-                        gotR = true;
-                        continue;
-                    }
-
-                    if (gotR)
-                    {
-                        if (data == 10)
-                            break;
-
-                        ms.WriteByte(13);
-
-                        gotR = false;
-                    }
-
-                    ms.WriteByte((byte) data);
+                    socket.IsAlive = false;
+                    return null;
                 }
 
-                string retval = ms.ConvertToAscii();
+                if (data == 13)
+                {
+                    gotR = true;
+                    continue;
+                }
 
-                if (log.IsDebugEnabled)
-                    log.Debug("ReadLine: " + retval);
+                if (gotR)
+                {
+                    if (data == 10)
+                        break;
 
-                return retval;
+                    ms.WriteByte(13);
+
+                    gotR = false;
+                }
+
+                ms.WriteByte((byte) data);
             }
+
+            return ms;
         }
 
         /// <summary>
