@@ -27,6 +27,11 @@ namespace Enyim.Caching.Memcached
         private NetworkStream _inputStream;
         private SslStream _sslStream;
 
+        private const int ReadBufferSize = 512;
+        private readonly byte[] _readBuffer = new byte[ReadBufferSize];
+        private int _readBufferOffset;
+        private int _readBufferCount;
+
         public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6)
         {
             _endpoint = endpoint;
@@ -186,7 +191,8 @@ namespace Enyim.Caching.Memcached
 
         public void Reset()
         {
-            // _inputStream.Flush();
+            _readBufferOffset = 0;
+            _readBufferCount = 0;
 
             int available = _socket.Available;
 
@@ -208,7 +214,8 @@ namespace Enyim.Caching.Memcached
 
         public async Task ResetAsync()
         {
-            // await _inputStream.FlushAsync();
+            _readBufferOffset = 0;
+            _readBufferCount = 0;
 
             int available = _socket.Available;
 
@@ -324,7 +331,21 @@ namespace Enyim.Caching.Memcached
 
             try
             {
-                return (_useSslStream ? _sslStream.ReadByte() : _inputStream.ReadByte());
+                if (_readBufferCount == 0)
+                {
+                    var stream = _useSslStream ? (Stream)_sslStream : _inputStream;
+                    int bytesRead = stream.Read(_readBuffer, 0, ReadBufferSize);
+                    if (bytesRead == 0)
+                    {
+                        return -1;
+                    }
+
+                    _readBufferOffset = 0;
+                    _readBufferCount = bytesRead;
+                }
+
+                _readBufferCount--;
+                return _readBuffer[_readBufferOffset++];
             }
             catch (Exception ex)
             {
@@ -343,7 +364,21 @@ namespace Enyim.Caching.Memcached
 
             try
             {
-                return (_useSslStream ? _sslStream.ReadByte() : _inputStream.ReadByte());
+                if (_readBufferCount == 0)
+                {
+                    var stream = _useSslStream ? (Stream)_sslStream : _inputStream;
+                    int bytesRead = stream.Read(_readBuffer, 0, ReadBufferSize);
+                    if (bytesRead == 0)
+                    {
+                        return -1;
+                    }
+
+                    _readBufferOffset = 0;
+                    _readBufferCount = bytesRead;
+                }
+
+                _readBufferCount--;
+                return _readBuffer[_readBufferOffset++];
             }
             catch (Exception ex)
             {
@@ -351,6 +386,7 @@ namespace Enyim.Caching.Memcached
                 {
                     _isAlive = false;
                 }
+
                 throw;
             }
         }
@@ -362,15 +398,31 @@ namespace Enyim.Caching.Memcached
             int read = 0;
             int shouldRead = count;
 
+            if (_readBufferCount > 0)
+            {
+                int fromBuffer = Math.Min(_readBufferCount, count);
+                Buffer.BlockCopy(_readBuffer, _readBufferOffset, buffer, offset, fromBuffer);
+                _readBufferOffset += fromBuffer;
+                _readBufferCount -= fromBuffer;
+                read += fromBuffer;
+                offset += fromBuffer;
+                shouldRead -= fromBuffer;
+            }
+
             while (read < count)
             {
                 try
                 {
                     int currentRead = (_useSslStream ? await _sslStream.ReadAsync(buffer, offset, shouldRead) : await _inputStream.ReadAsync(buffer, offset, shouldRead));
-                    if (currentRead == count)
+                    if (currentRead == shouldRead)
+                    {
                         break;
+                    }
+
                     if (currentRead < 1)
+                    {
                         throw new IOException("The socket seems to be disconnected");
+                    }
 
                     read += currentRead;
                     offset += currentRead;
@@ -402,15 +454,31 @@ namespace Enyim.Caching.Memcached
             int read = 0;
             int shouldRead = count;
 
+            if (_readBufferCount > 0)
+            {
+                int fromBuffer = Math.Min(_readBufferCount, count);
+                Buffer.BlockCopy(_readBuffer, _readBufferOffset, buffer, offset, fromBuffer);
+                _readBufferOffset += fromBuffer;
+                _readBufferCount -= fromBuffer;
+                read += fromBuffer;
+                offset += fromBuffer;
+                shouldRead -= fromBuffer;
+            }
+
             while (read < count)
             {
                 try
                 {
                     int currentRead = (_useSslStream ? _sslStream.Read(buffer, offset, shouldRead) : _inputStream.Read(buffer, offset, shouldRead));
-                    if (currentRead == count)
+                    if (currentRead == shouldRead)
+                    {
                         break;
+                    }
+
                     if (currentRead < 1)
+                    {
                         throw new IOException("The socket seems to be disconnected");
+                    }
 
                     read += currentRead;
                     offset += currentRead;
@@ -422,6 +490,7 @@ namespace Enyim.Caching.Memcached
                     {
                         _isAlive = false;
                     }
+
                     throw;
                 }
             }

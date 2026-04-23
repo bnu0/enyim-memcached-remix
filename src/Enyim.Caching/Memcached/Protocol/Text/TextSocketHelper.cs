@@ -1,15 +1,20 @@
 ﻿using System;
+using System.Buffers;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
     internal static class TextSocketHelper
     {
         private const string GenericErrorResponse = "ERROR";
+        private static byte[] GenericErrorResponseBytes = Encoding.ASCII.GetBytes(GenericErrorResponse);
         private const string ClientErrorResponse = "CLIENT_ERROR ";
+        private static byte[] ClientErrorResponseBytes = Encoding.ASCII.GetBytes(ClientErrorResponse);
         private const string ServerErrorResponse = "SERVER_ERROR ";
+        private static byte[] ServerErrorResponseBytes = Encoding.ASCII.GetBytes(ServerErrorResponse);
         private const int ErrorResponseLength = 13;
 
         public const string CommandTerminator = "\r\n";
@@ -26,6 +31,10 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         public static string ReadResponse(PooledSocket socket)
         {
             string response = TextSocketHelper.ReadLine(socket);
+            if (response == null)
+            {
+                return string.Empty;
+            }
 
             if (log.IsDebugEnabled)
                 log.Debug("Received response: " + response);
@@ -50,17 +59,104 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
             return response;
         }
+        
+        public static (string[], int) ReadResponseParts(PooledSocket socket)
+        {
+            var ms = ReadSocketContet(socket);
+            if (ms == null)
+            {
+                return (Array.Empty<string>(), 0);
+            }
+
+            var buff = ArrayPool<byte>.Shared.Rent(ms.Length);
+            try
+            {
+                buff = ms.ToArray(buff);
+
+                if (log.IsDebugEnabled)
+                    log.Debug("Received response: " + Encoding.ASCII.GetString(buff, 0, ms.Length));
+
+                if (ms.Length == 0)
+                    throw new MemcachedClientException("Empty response received.");
+
+                if (ms.Length >= GenericErrorResponseBytes.Length && buff.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
+                    throw new NotSupportedException(
+                        "Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
+
+                if (ms.Length >= ErrorResponseLength)
+                {
+                    if (buff.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
+                    {
+                        throw new MemcachedClientException(Encoding.ASCII.GetString(buff, ErrorResponseLength,
+                            ms.Length - ErrorResponseLength));
+                    }
+                    else if (buff.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
+                    {
+                        throw new MemcachedException(Encoding.ASCII.GetString(buff, 0, ErrorResponseLength));
+                    }
+                }
+
+                var lastIndex = 0;
+                var partCount = 0;
+                var ret = new string[5];
+                for (var i = 0; i < ms.Length; i++)
+                {
+                    if (partCount >= 5)
+                    {
+                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
+                    }
+
+                    if (buff[i] == 0x20) // ascii blank space
+                    {
+                        ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, i - lastIndex);
+                        partCount++;
+                        lastIndex = i + 1;
+                    }
+                }
+
+                // capture last token
+                if (lastIndex < ms.Length)
+                {
+                    if (partCount >= ret.Length)
+                    {
+                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
+                    }
+                    ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, ms.Length - lastIndex);
+                    partCount++;
+                }
+
+                return (ret, partCount);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buff);
+                ms.Dispose();
+            }
+        }
 
         /// <summary>
         /// Reads a line from the socket. A line is terninated by \r\n.
         /// </summary>
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
+        { 
+            using (var ms = ReadSocketContet(socket))
+            {
+                if (ms == null)
+                    return string.Empty;
+                string retval = ms.ConvertToAscii();
+                if (log.IsDebugEnabled)
+                    log.Debug("ReadLine: " + retval);
+
+                return retval;
+            }
+        }
+
+        private static SegmentedMemoryStream ReadSocketContet(PooledSocket socket)
         {
-            var ms = new MemoryStream(50);
+            var ms = new SegmentedMemoryStream(1024);
 
             bool gotR = false;
-            //byte[] buffer = new byte[1];
 
             int data;
 
@@ -70,8 +166,10 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
                 if (data == -1) // EOF / half-open → kill this socket
                 {
+                    log.Warn("Socket EOF/half-open, killing socket");
                     socket.IsAlive = false;
-                    return string.Empty;
+                    ms.Dispose();
+                    return null;
                 }
 
                 if (data == 13)
@@ -90,15 +188,10 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                     gotR = false;
                 }
 
-                ms.WriteByte((byte)data);
+                ms.WriteByte((byte) data);
             }
 
-            string retval = Encoding.ASCII.GetString(ms.ToArray(), 0, (int)ms.Length);
-
-            if (log.IsDebugEnabled)
-                log.Debug("ReadLine: " + retval);
-
-            return retval;
+            return ms;
         }
 
         /// <summary>

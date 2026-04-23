@@ -17,16 +17,24 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         public static GetResponse ReadItem(PooledSocket socket)
         {
-            string description = TextSocketHelper.ReadResponse(socket);
+            (string[] parts, int count) = TextSocketHelper.ReadResponseParts(socket);
 
-            if (String.Compare(description, "END", StringComparison.Ordinal) == 0)
+            if (count == 1 && String.Compare(parts[0], "END", StringComparison.Ordinal) == 0)
                 return null;
 
-            if (description.Length < 6 || String.Compare(description, 0, "VALUE ", 0, 6, StringComparison.Ordinal) != 0)
-                throw new MemcachedClientException("No VALUE response received.\r\n" + description);
+            var totalLenth = 0;
+            foreach(var part in parts)
+            {
+                if (part != null)
+                {
+                    totalLenth += part.Length;
+                }
+            }
+
+            if (totalLenth < 6 || String.Compare(parts[0], 0, "VALUE", 0, 5, StringComparison.Ordinal) != 0)
+                throw new MemcachedClientException($"No VALUE response received ({count} parts).\r\n" + string.Join(" ", parts));
 
             ulong cas = 0;
-            string[] parts = description.Split(' ');
 
             // response is:
             // VALUE <key> <flags> <bytes> [<cas unique>]
@@ -34,15 +42,15 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             //
             // cas only exists in 1.2.4+
             //
-            if (parts.Length == 5)
+            if (count == 5)
             {
                 if (!UInt64.TryParse(parts[4], out cas))
                     throw new MemcachedClientException("Invalid CAS VALUE received.");
 
             }
-            else if (parts.Length < 4)
+            else if (count < 4)
             {
-                throw new MemcachedClientException("Invalid VALUE response received: " + description);
+                throw new MemcachedClientException("Invalid VALUE response received: " + string.Join(" ", parts));
             }
 
             ushort flags = UInt16.Parse(parts[2], CultureInfo.InvariantCulture);
@@ -88,7 +96,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 #region [ License information          ]
 /* ************************************************************
  * 
- *    Copyright (c) 2010 Attila Kiskó, enyim.com
+ *    Copyright (c) 2010 Attila KiskÃ³, enyim.com
  *    
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
