@@ -69,53 +69,69 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
 
             var buff = ArrayPool<byte>.Shared.Rent(ms.Length);
-            buff = ms.ToArray(buff);
-
-            if (log.IsDebugEnabled)
-                log.Debug("Received response: " + Encoding.ASCII.GetString(buff, 0, ms.Length));
-
-            if (buff.Length == 0)
-                throw new MemcachedClientException("Empty response received.");
-
-            if (buff.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
-                throw new NotSupportedException("Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
-
-            if (buff.Length >= ErrorResponseLength)
+            try
             {
-                if (buff.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
-                {
-                    throw new MemcachedClientException(Encoding.ASCII.GetString(buff, ErrorResponseLength, ms.Length - ErrorResponseLength));
-                }
-                else if (buff.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
-                {
-                    throw new MemcachedException(Encoding.ASCII.GetString(buff,0, ErrorResponseLength));
-                }
-            }
+                buff = ms.ToArray(buff);
 
-            var lastIndex = 0;
-            var currIndex = 0;
-            var partCount = 0;
-            var ret = new string[5];
-            for (var i = 0; i < ms.Length; i++)
-            {
-                if (buff[i] == 0x20) // ascii blank space
+                if (log.IsDebugEnabled)
+                    log.Debug("Received response: " + Encoding.ASCII.GetString(buff, 0, ms.Length));
+
+                if (ms.Length == 0)
+                    throw new MemcachedClientException("Empty response received.");
+
+                if (ms.Length >= GenericErrorResponseBytes.Length && buff.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
+                    throw new NotSupportedException(
+                        "Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
+
+                if (ms.Length >= ErrorResponseLength)
                 {
-                    ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, currIndex - lastIndex);
+                    if (buff.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
+                    {
+                        throw new MemcachedClientException(Encoding.ASCII.GetString(buff, ErrorResponseLength,
+                            ms.Length - ErrorResponseLength));
+                    }
+                    else if (buff.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
+                    {
+                        throw new MemcachedException(Encoding.ASCII.GetString(buff, 0, ErrorResponseLength));
+                    }
+                }
+
+                var lastIndex = 0;
+                var partCount = 0;
+                var ret = new string[5];
+                for (var i = 0; i < ms.Length; i++)
+                {
+                    if (partCount >= 5)
+                    {
+                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
+                    }
+
+                    if (buff[i] == 0x20) // ascii blank space
+                    {
+                        ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, i - lastIndex);
+                        partCount++;
+                        lastIndex = i + 1;
+                    }
+                }
+
+                // capture last token
+                if (lastIndex < ms.Length)
+                {
+                    if (partCount >= ret.Length)
+                    {
+                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
+                    }
+                    ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, ms.Length - lastIndex);
                     partCount++;
-                    lastIndex = currIndex + 1;
                 }
-                currIndex++;
-            }
 
-            if (partCount == 0 && ms.Length > 0)
+                return (ret, partCount);
+            }
+            finally
             {
-                ret[0] = Encoding.ASCII.GetString(buff, 0, ms.Length);
-                partCount = 1;
+                ArrayPool<byte>.Shared.Return(buff);
+                ms.Dispose();
             }
-            
-            ArrayPool<byte>.Shared.Return(buff);
-
-            return (ret, partCount);
         }
 
         /// <summary>
@@ -124,12 +140,16 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
         { 
-            var ms = ReadSocketContet(socket);
-            string retval = ms.ConvertToAscii();
-            if (log.IsDebugEnabled)
-                log.Debug("ReadLine: " + retval);
+            using (var ms = ReadSocketContet(socket))
+            {
+                if (ms == null)
+                    return string.Empty;
+                string retval = ms.ConvertToAscii();
+                if (log.IsDebugEnabled)
+                    log.Debug("ReadLine: " + retval);
 
-            return retval;
+                return retval;
+            }
         }
 
         private static SegmentedMemoryStream ReadSocketContet(PooledSocket socket)
@@ -146,7 +166,9 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
                 if (data == -1) // EOF / half-open → kill this socket
                 {
+                    log.Warn("Socket EOF/half-open, killing socket");
                     socket.IsAlive = false;
+                    ms.Dispose();
                     return null;
                 }
 

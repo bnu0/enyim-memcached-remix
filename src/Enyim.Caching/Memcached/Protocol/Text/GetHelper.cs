@@ -20,7 +20,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         {
             (string[] parts, int count) = TextSocketHelper.ReadResponseParts(socket);
 
-            if (parts[0] != null && String.Compare(parts[0], "END", StringComparison.Ordinal) == 0)
+            if (count == 1 && String.Compare(parts[0], "END", StringComparison.Ordinal) == 0)
                 return null;
 
             var totalLenth = 0;
@@ -33,7 +33,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
 
             if (totalLenth < 6 || String.Compare(parts[0], 0, "VALUE", 0, 5, StringComparison.Ordinal) != 0)
-                throw new MemcachedClientException("No VALUE response received.\r\n" + string.Join(" ", parts));
+                throw new MemcachedClientException($"No VALUE response received ({count} parts).\r\n" + string.Join(" ", parts));
 
             ulong cas = 0;
 

@@ -37,7 +37,7 @@ public class SegmentedMemoryStream : IDisposable
         for(var i = 0; i < _segments.Count; i++)
         {
             var chunkMax = _chunkSize;
-            if (i == _segments.Count - 1)
+            if (i == _segments.Count - 1 && _length % _chunkSize != 0)
                 chunkMax = _length % _chunkSize;
             for(var j = 0; j < chunkMax; j++)
                 arr[(i * _chunkSize) + j] = _segments[i][j];
@@ -48,9 +48,15 @@ public class SegmentedMemoryStream : IDisposable
     public string ConvertToAscii()
     {
         var arr = ArrayPool<byte>.Shared.Rent(_length);
-        var ret= Encoding.ASCII.GetString(ToArray(arr), 0, _length);
-        ArrayPool<byte>.Shared.Return(arr);
-        return ret;
+        try
+        {
+            var ret = Encoding.ASCII.GetString(ToArray(arr), 0, _length);
+            return ret;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(arr);
+        } 
     }
 
     public void Dispose()
