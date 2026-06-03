@@ -11,7 +11,11 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override System.Collections.Generic.IList<ArraySegment<byte>> GetBuffer()
         {
+#if NET8_0_OR_GREATER
+            var command = TextSocketHelper.CreateCommand("delete ", Key);
+#else
             var command = "delete " + Key + TextSocketHelper.CommandTerminator;
+#endif
 
             return TextSocketHelper.GetCommandBuffer(command);
         }

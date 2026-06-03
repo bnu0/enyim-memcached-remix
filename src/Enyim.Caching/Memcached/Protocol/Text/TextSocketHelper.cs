@@ -220,6 +220,121 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             return ms;
         }
 
+#if NET8_0_OR_GREATER
+        internal static string CreateCommand(string content)
+        {
+            int totalLength = content.Length + CommandTerminator.Length;
+
+            return string.Create(totalLength, content, static (span, value) =>
+            {
+                value.AsSpan().CopyTo(span);
+                CommandTerminator.AsSpan().CopyTo(span.Slice(value.Length));
+            });
+        }
+
+        internal static string CreateCommand(string prefix, string suffix)
+        {
+            int totalLength = prefix.Length + suffix.Length + CommandTerminator.Length;
+
+            return string.Create(totalLength, (prefix, suffix), static (span, parts) =>
+            {
+                int position = 0;
+                parts.prefix.AsSpan().CopyTo(span.Slice(position));
+                position += parts.prefix.Length;
+                parts.suffix.AsSpan().CopyTo(span.Slice(position));
+                position += parts.suffix.Length;
+                CommandTerminator.AsSpan().CopyTo(span.Slice(position));
+            });
+        }
+
+        internal static string CreateCommand(string prefix, string part1, string separator, string part2)
+        {
+            int totalLength = prefix.Length + part1.Length + separator.Length + part2.Length + CommandTerminator.Length;
+
+            return string.Create(totalLength, (prefix, part1, separator, part2), static (span, parts) =>
+            {
+                int position = 0;
+                parts.prefix.AsSpan().CopyTo(span.Slice(position));
+                position += parts.prefix.Length;
+                parts.part1.AsSpan().CopyTo(span.Slice(position));
+                position += parts.part1.Length;
+                parts.separator.AsSpan().CopyTo(span.Slice(position));
+                position += parts.separator.Length;
+                parts.part2.AsSpan().CopyTo(span.Slice(position));
+                position += parts.part2.Length;
+                CommandTerminator.AsSpan().CopyTo(span.Slice(position));
+            });
+        }
+
+        internal static string CreateMultiGetCommand(string commandPrefix, IList<string> keys)
+        {
+            int totalLength = commandPrefix.Length + CommandTerminator.Length;
+            if (keys.Count > 0)
+            {
+                totalLength += keys.Sum(k => k.Length) + keys.Count - 1;
+            }
+
+            return string.Create(totalLength, (commandPrefix, keys), static (span, state) =>
+            {
+                int position = 0;
+                state.commandPrefix.AsSpan().CopyTo(span.Slice(position));
+                position += state.commandPrefix.Length;
+                for (int i = 0; i < state.keys.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        span[position++] = ' ';
+                    }
+
+                    state.keys[i].CopyTo(span.Slice(position));
+                    position += state.keys[i].Length;
+                }
+
+                CommandTerminator.AsSpan().CopyTo(span.Slice(position));
+            });
+        }
+
+        internal static string CreateStoreCommand(
+            string commandPrefix,
+            string key,
+            string flags,
+            string expires,
+            string dataLength,
+            string cas = null)
+        {
+            int totalLength = commandPrefix.Length + key.Length + 1
+                + flags.Length + 1 + expires.Length + 1 + dataLength.Length
+                + (cas == null ? 0 : 1 + cas.Length)
+                + CommandTerminator.Length;
+
+            return string.Create(totalLength, (commandPrefix, key, flags, expires, dataLength, cas), static (span, parts) =>
+            {
+                int position = 0;
+                position = AppendCommandPart(span, position, parts.commandPrefix);
+                position = AppendCommandPart(span, position, parts.key);
+                span[position++] = ' ';
+                position = AppendCommandPart(span, position, parts.flags);
+                span[position++] = ' ';
+                position = AppendCommandPart(span, position, parts.expires);
+                span[position++] = ' ';
+                position = AppendCommandPart(span, position, parts.dataLength);
+                if (parts.cas != null)
+                {
+                    span[position++] = ' ';
+                    position = AppendCommandPart(span, position, parts.cas);
+                }
+
+                CommandTerminator.AsSpan().CopyTo(span.Slice(position));
+            });
+        }
+
+        private static int AppendCommandPart(Span<char> span, int position, string value)
+        {
+            value.AsSpan().CopyTo(span.Slice(position));
+            return position + value.Length;
+        }
+#endif
+
         /// <summary>
         /// Gets the bytes representing the specified command. returned buffer can be used to streamline multiple writes into one Write on the Socket
         /// using the <see cref="M:Enyim.Caching.Memcached.PooledSocket.Write(IList&lt;ArraySegment&lt;byte&gt;&gt;)"/>

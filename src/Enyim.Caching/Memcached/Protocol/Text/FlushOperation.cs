@@ -11,7 +11,11 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override IList<System.ArraySegment<byte>> GetBuffer()
         {
+#if NET8_0_OR_GREATER
+            return TextSocketHelper.GetCommandBuffer(TextSocketHelper.CreateCommand("flush_all"));
+#else
             return TextSocketHelper.GetCommandBuffer("flush_all" + TextSocketHelper.CommandTerminator);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)

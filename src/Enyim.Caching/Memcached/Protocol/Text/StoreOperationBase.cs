@@ -26,29 +26,56 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override System.Collections.Generic.IList<ArraySegment<byte>> GetBuffer()
         {
-            // todo adjust the size to fit a request using a fnv hashed key
-            var sb = new StringBuilder(128);
             var buffers = new List<ArraySegment<byte>>(3);
+            string commandPrefix;
+            string command;
 
             switch (_command)
             {
-                case StoreCommand.Add: sb.Append("add "); break;
-                case StoreCommand.Replace: sb.Append("replace "); break;
-                case StoreCommand.Set: sb.Append("set "); break;
-                case StoreCommand.Append: sb.Append("append "); break;
-                case StoreCommand.Prepend: sb.Append("prepend "); break;
-                case StoreCommand.CheckAndSet: sb.Append("cas "); break;
+                case StoreCommand.Add: commandPrefix = "add "; break;
+                case StoreCommand.Replace: commandPrefix = "replace "; break;
+                case StoreCommand.Set: commandPrefix = "set "; break;
+                case StoreCommand.Append: commandPrefix = "append "; break;
+                case StoreCommand.Prepend: commandPrefix = "prepend "; break;
+                case StoreCommand.CheckAndSet: commandPrefix = "cas "; break;
                 default: throw new MemcachedClientException(_command + " is not supported.");
             }
 
+            var data = _value.Data;
+#if NET8_0_OR_GREATER
+            var flagsText = _value.Flags.ToString(CultureInfo.InvariantCulture);
+            var expiresText = _expires.ToString(CultureInfo.InvariantCulture);
+            var dataLengthText = data.Count.ToString(CultureInfo.InvariantCulture);
+            if (_command == StoreCommand.CheckAndSet)
+            {
+                command = TextSocketHelper.CreateStoreCommand(
+                    commandPrefix,
+                    Key,
+                    flagsText,
+                    expiresText,
+                    dataLengthText,
+                    _cas.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                command = TextSocketHelper.CreateStoreCommand(
+                    commandPrefix,
+                    Key,
+                    flagsText,
+                    expiresText,
+                    dataLengthText);
+            }
+#else
+            // todo adjust the size to fit a request using a fnv hashed key
+            var sb = new StringBuilder(128);
+
+            sb.Append(commandPrefix);
             sb.Append(Key);
             sb.Append(" ");
             sb.Append(_value.Flags.ToString(CultureInfo.InvariantCulture));
             sb.Append(" ");
             sb.Append(_expires.ToString(CultureInfo.InvariantCulture));
             sb.Append(" ");
-
-            var data = _value.Data;
             sb.Append(Convert.ToString(data.Count, CultureInfo.InvariantCulture));
 
             if (_command == StoreCommand.CheckAndSet)
@@ -58,8 +85,10 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
 
             sb.Append(TextSocketHelper.CommandTerminator);
+            command = sb.ToString();
+#endif
 
-            TextSocketHelper.GetCommandBuffer(sb.ToString(), buffers);
+            TextSocketHelper.GetCommandBuffer(command, buffers);
             buffers.Add(data);
             buffers.Add(StoreOperationBase._dataTerminator);
 
