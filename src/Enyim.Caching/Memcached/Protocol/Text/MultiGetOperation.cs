@@ -23,7 +23,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             // gets key1 key2 key3 ... keyN\r\n
             string command;
 #if NET8_0_OR_GREATER
-            int totalLength = Keys.Sum(s => s.Length) + (Keys.Count - 1) + CommandStr.Length;
+            int totalLength = Keys.Sum(s => s.Length) + Math.Max(Keys.Count - 1, 0) + CommandStr.Length + TextSocketHelper.CommandTerminator.Length;
 
             command = string.Create(totalLength, Keys, (span, state) =>
             {
@@ -32,10 +32,16 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                 position += CommandStr.Length;
                 for (int i = 0; i < state.Count; i++)
                 {
-                    if (i > 0) span[position++] = ',';
+                    if (i > 0)
+                    {
+                        span[position++] = ' ';
+                    }
+
                     state[i].CopyTo(span.Slice(position));
                     position += state[i].Length;
                 }
+
+                TextSocketHelper.CommandTerminator.AsSpan().CopyTo(span.Slice(position));
             });
 #else
             command = CommandStr + String.Join(" ", Keys.ToArray()) + TextSocketHelper.CommandTerminator;
