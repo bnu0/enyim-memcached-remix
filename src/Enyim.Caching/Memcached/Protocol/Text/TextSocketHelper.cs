@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
@@ -20,6 +21,21 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         public const string CommandTerminator = "\r\n";
 
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(TextSocketHelper));
+
+        private static readonly ObjectPool<SegmentedMemoryStream> SegmentedMemoryStreamPool =
+            new DefaultObjectPoolProvider { MaximumRetained = 64 }
+                .Create(new SegmentedMemoryStreamPoolPolicy());
+
+        private sealed class SegmentedMemoryStreamPoolPolicy : IPooledObjectPolicy<SegmentedMemoryStream>
+        {
+            public SegmentedMemoryStream Create() => new SegmentedMemoryStream(1024);
+
+            public bool Return(SegmentedMemoryStream obj)
+            {
+                obj.Reset();
+                return true;
+            }
+        }
 
         /// <summary>
         /// Reads the response of the server.
@@ -130,7 +146,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             finally
             {
                 ArrayPool<byte>.Shared.Return(buff);
-                ms.Dispose();
+                SegmentedMemoryStreamPool.Return(ms);
             }
         }
 
@@ -139,22 +155,32 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         /// </summary>
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
-        { 
-            using (var ms = ReadSocketContet(socket))
+        {
+            var ms = ReadSocketContet(socket);
+            if (ms == null)
             {
-                if (ms == null)
-                    return string.Empty;
+                return string.Empty;
+            }
+
+            try
+            {
                 string retval = ms.ConvertToAscii();
                 if (log.IsDebugEnabled)
+                {
                     log.Debug("ReadLine: " + retval);
+                }
 
                 return retval;
+            }
+            finally
+            {
+                SegmentedMemoryStreamPool.Return(ms);
             }
         }
 
         private static SegmentedMemoryStream ReadSocketContet(PooledSocket socket)
         {
-            var ms = new SegmentedMemoryStream(1024);
+            var ms = SegmentedMemoryStreamPool.Get();
 
             bool gotR = false;
 
@@ -168,7 +194,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                 {
                     log.Warn("Socket EOF/half-open, killing socket");
                     socket.IsAlive = false;
-                    ms.Dispose();
+                    SegmentedMemoryStreamPool.Return(ms);
                     return null;
                 }
 

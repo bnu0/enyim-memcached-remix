@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Collections.Pooled;
 using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached.Results.Extensions;
 
@@ -107,80 +108,96 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
-            var result = new TextOperationResult();
-
-            var response = new BinaryResponse();
-
-            while (response.Read(socket))
+            using (var retval = new PooledDictionary<string, CacheItem>())
+            using (var cas = new PooledDictionary<string, ulong>())
             {
-                StatusCode = response.StatusCode;
+                var result = new TextOperationResult();
+                var response = new BinaryResponse();
 
-                // found the noop, quit
-                if (response.CorrelationId == _noopId)
-                    return result.Pass();
-
-                string key;
-
-                // find the key to the response
-                if (!_idToKey.TryGetValue(response.CorrelationId, out key))
+                while (response.Read(socket))
                 {
-                    // we're not supposed to get here tho
-                    _log.WarnFormat("Found response with CorrelationId {0}, but no key is matching it.", response.CorrelationId);
-                    continue;
+                    StatusCode = response.StatusCode;
+
+                    // found the noop, quit
+                    if (response.CorrelationId == _noopId)
+                    {
+                        _result = new Dictionary<string, CacheItem>(retval);
+                        Cas = new Dictionary<string, ulong>(cas);
+                        return result.Pass();
+                    }
+
+                    string key;
+
+                    // find the key to the response
+                    if (!_idToKey.TryGetValue(response.CorrelationId, out key))
+                    {
+                        // we're not supposed to get here tho
+                        _log.WarnFormat("Found response with CorrelationId {0}, but no key is matching it.", response.CorrelationId);
+                        continue;
+                    }
+
+                    if (_log.IsDebugEnabled) _log.DebugFormat("Reading item {0}", key);
+
+                    // deserialize the response
+                    int flags = BinaryConverter.DecodeInt32(response.Extra, 0);
+
+                    retval[key] = new CacheItem((ushort)flags, response.Data);
+                    cas[key] = response.CAS;
                 }
 
-                if (_log.IsDebugEnabled) _log.DebugFormat("Reading item {0}", key);
+                _result = new Dictionary<string, CacheItem>(retval);
+                Cas = new Dictionary<string, ulong>(cas);
 
-                // deserialize the response
-                int flags = BinaryConverter.DecodeInt32(response.Extra, 0);
-
-                _result[key] = new CacheItem((ushort)flags, response.Data);
-                Cas[key] = response.CAS;
+                // finished reading but we did not find the NOOP
+                return result.Fail("Found response with CorrelationId {0}, but no key is matching it.");
             }
-
-            // finished reading but we did not find the NOOP
-            return result.Fail("Found response with CorrelationId {0}, but no key is matching it.");
         }
 
         protected internal override async ValueTask<IOperationResult> ReadResponseAsync(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
-            var result = new TextOperationResult();
-
-            var response = new BinaryResponse();
-
-            while (await response.ReadAsync(socket))
+            using (var retval = new PooledDictionary<string, CacheItem>())
+            using (var cas = new PooledDictionary<string, ulong>())
             {
-                StatusCode = response.StatusCode;
+                var result = new TextOperationResult();
+                var response = new BinaryResponse();
 
-                // found the noop, quit
-                if (response.CorrelationId == _noopId)
-                    return result.Pass();
-
-                string key;
-
-                // find the key to the response
-                if (!_idToKey.TryGetValue(response.CorrelationId, out key))
+                while (await response.ReadAsync(socket))
                 {
-                    // we're not supposed to get here tho
-                    _log.WarnFormat("Found response with CorrelationId {0}, but no key is matching it.", response.CorrelationId);
-                    continue;
+                    StatusCode = response.StatusCode;
+
+                    // found the noop, quit
+                    if (response.CorrelationId == _noopId)
+                    {
+                        _result = new Dictionary<string, CacheItem>(retval);
+                        Cas = new Dictionary<string, ulong>(cas);
+                        return result.Pass();
+                    }
+
+                    string key;
+
+                    // find the key to the response
+                    if (!_idToKey.TryGetValue(response.CorrelationId, out key))
+                    {
+                        // we're not supposed to get here tho
+                        _log.WarnFormat("Found response with CorrelationId {0}, but no key is matching it.", response.CorrelationId);
+                        continue;
+                    }
+
+                    if (_log.IsDebugEnabled) _log.DebugFormat("Reading item {0}", key);
+
+                    // deserialize the response
+                    int flags = BinaryConverter.DecodeInt32(response.Extra, 0);
+
+                    retval[key] = new CacheItem((ushort)flags, response.Data);
+                    cas[key] = response.CAS;
                 }
 
-                if (_log.IsDebugEnabled) _log.DebugFormat("Reading item {0}", key);
+                _result = new Dictionary<string, CacheItem>(retval);
+                Cas = new Dictionary<string, ulong>(cas);
 
-                // deserialize the response
-                int flags = BinaryConverter.DecodeInt32(response.Extra, 0);
-
-                _result[key] = new CacheItem((ushort)flags, response.Data);
-                Cas[key] = response.CAS;
+                // finished reading but we did not find the NOOP
+                return result.Fail("Found response with CorrelationId {0}, but no key is matching it.");
             }
-
-            // finished reading but we did not find the NOOP
-            return result.Fail("Found response with CorrelationId {0}, but no key is matching it.");
         }
 
         public Dictionary<string, CacheItem> Result

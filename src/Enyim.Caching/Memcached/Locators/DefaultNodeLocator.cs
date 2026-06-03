@@ -1,5 +1,8 @@
+using CommunityToolkit.HighPerformance ;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -126,7 +129,17 @@ namespace Enyim.Caching.Memcached
         {
             if (_keys.Length == 0) return null;
 
-            uint itemKeyHash = BitConverter.ToUInt32(new FNV1a(true).ComputeHash(Encoding.UTF8.GetBytes(key)), 0);
+            var buf = ArrayPool<byte>.Shared.Rent(key.Length);
+            uint itemKeyHash;
+            try
+            {
+                Encoding.UTF8.GetBytes(key, 0, key.Length, buf, 0);
+                itemKeyHash = BitConverter.ToUInt32(new FNV1a(true).ComputeHash(buf.AsMemory(0, key.Length).AsStream()), 0);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buf);
+            } 
             // get the index of the server assigned to this hash
             int foundIndex = Array.BinarySearch<uint>(_keys, itemKeyHash);
 

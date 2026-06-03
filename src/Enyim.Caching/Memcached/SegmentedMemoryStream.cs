@@ -58,12 +58,19 @@ public class SegmentedMemoryStream : IDisposable
         } 
     }
 
-    public void Dispose()
+    internal void Reset()
     {
         for (var i = 0; i < _segments.Count; i++)
         {
             ArrayPool<byte>.Shared.Return(_segments[i]);
-            _segments[i] = null;
         }
+
+        _segments.Clear();
+        _length = 0;
+    }
+
+    public void Dispose()
+    {
+        Reset();
     }
 }
