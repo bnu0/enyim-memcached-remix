@@ -14,15 +14,38 @@ namespace Enyim.Caching.Memcached
     /// </summary>
     public sealed class DefaultNodeLocator : IMemcachedNodeLocator, IDisposable
     {
-        private readonly int _serverAddressMutations;
+        private sealed class LocatorSnapshot
+        {
+            public static readonly LocatorSnapshot Empty = new(
+                Array.Empty<uint>(),
+                new Dictionary<uint, IMemcachedNode>(new UIntEqualityComparer()),
+                Array.Empty<IMemcachedNode>(),
+                new HashSet<IMemcachedNode>());
 
-        // holds all server keys for mapping an item key to the server consistently
-        private uint[] _keys;
-        // used to lookup a server based on its key
-        private Dictionary<uint, IMemcachedNode> _servers;
-        private Dictionary<IMemcachedNode, bool> _deadServers;
-        private List<IMemcachedNode> _allServers;
-        private ReaderWriterLockSlim _serverAccessLock;
+            public LocatorSnapshot(
+                uint[] keys,
+                Dictionary<uint, IMemcachedNode> servers,
+                IReadOnlyList<IMemcachedNode> allServers,
+                HashSet<IMemcachedNode> deadServers)
+            {
+                Keys = keys;
+                Servers = servers;
+                AllServers = allServers;
+                DeadServers = deadServers;
+            }
+
+            public uint[] Keys { get; }
+
+            public Dictionary<uint, IMemcachedNode> Servers { get; }
+
+            public IReadOnlyList<IMemcachedNode> AllServers { get; }
+
+            public HashSet<IMemcachedNode> DeadServers { get; }
+        }
+
+        private readonly int _serverAddressMutations;
+        private readonly object _deadServerLock = new();
+        private LocatorSnapshot _snapshot = LocatorSnapshot.Empty;
 
         public DefaultNodeLocator() : this(100)
         {
@@ -30,90 +53,97 @@ namespace Enyim.Caching.Memcached
 
         public DefaultNodeLocator(int serverAddressMutations)
         {
-            _servers = new Dictionary<uint, IMemcachedNode>(new UIntEqualityComparer());
-            _deadServers = new Dictionary<IMemcachedNode, bool>();
-            _allServers = new List<IMemcachedNode>();
-            _serverAccessLock = new ReaderWriterLockSlim();
             _serverAddressMutations = serverAddressMutations;
         }
 
-        private void BuildIndex(List<IMemcachedNode> nodes)
+        private LocatorSnapshot BuildSnapshot(
+            IReadOnlyList<IMemcachedNode> allServers,
+            HashSet<IMemcachedNode> deadServers,
+            IList<IMemcachedNode> ringNodes)
         {
-            var keys = new uint[nodes.Count * _serverAddressMutations];
+            var servers = new Dictionary<uint, IMemcachedNode>(new UIntEqualityComparer());
+            var keys = new uint[ringNodes.Count * _serverAddressMutations];
 
             int nodeIdx = 0;
 
-            foreach (IMemcachedNode node in nodes)
+            foreach (IMemcachedNode node in ringNodes)
             {
                 var tmpKeys = GenerateKeys(node, _serverAddressMutations);
 
                 for (var i = 0; i < tmpKeys.Length; i++)
                 {
-                    _servers[tmpKeys[i]] = node;
+                    servers[tmpKeys[i]] = node;
                 }
 
                 tmpKeys.CopyTo(keys, nodeIdx);
                 nodeIdx += _serverAddressMutations;
             }
 
-            Array.Sort<uint>(keys);
-            Interlocked.Exchange(ref _keys, keys);
+            Array.Sort(keys);
+            return new LocatorSnapshot(keys, servers, allServers, deadServers);
         }
 
         void IMemcachedNodeLocator.Initialize(IList<IMemcachedNode> nodes)
         {
-            _serverAccessLock.EnterWriteLock();
-
-            try
+            lock (_deadServerLock)
             {
-                _allServers = nodes.ToList();
-                BuildIndex(_allServers);
-            }
-            finally
-            {
-                _serverAccessLock.ExitWriteLock();
+                var snapshot = Volatile.Read(ref _snapshot) ?? LocatorSnapshot.Empty;
+                var deadServers = new HashSet<IMemcachedNode>(snapshot.DeadServers);
+                var allServers = nodes.ToList();
+                Interlocked.Exchange(ref _snapshot, BuildSnapshot(allServers, deadServers, allServers));
             }
         }
 
         IMemcachedNode IMemcachedNodeLocator.Locate(string key)
         {
-            if (key == null) throw new ArgumentNullException("key");
+            if (key == null)
+            {
+                throw new ArgumentNullException("key");
+            }
 
-            _serverAccessLock.EnterUpgradeableReadLock();
-
-            try { return Locate(key); }
-            finally { _serverAccessLock.ExitUpgradeableReadLock(); }
+            return Locate(key);
         }
 
         IEnumerable<IMemcachedNode> IMemcachedNodeLocator.GetWorkingNodes()
         {
-            _serverAccessLock.EnterReadLock();
+            var snapshot = Volatile.Read(ref _snapshot);
+            if (snapshot == null)
+            {
+                return Array.Empty<IMemcachedNode>();
+            }
 
-            try { return _allServers.Except(_deadServers.Keys).ToArray(); }
-            finally { _serverAccessLock.ExitReadLock(); }
+            return snapshot.AllServers.Where(n => !snapshot.DeadServers.Contains(n)).ToArray();
         }
 
         private IMemcachedNode Locate(string key)
         {
-            var node = FindNode(key);
-            if (node == null || node.IsAlive)
-                return node;
-
-            // move the current node to the dead list and rebuild the indexes
-            _serverAccessLock.EnterWriteLock();
-
-            try
+            var snapshot = Volatile.Read(ref _snapshot);
+            if (snapshot == null)
             {
-                // check if it's still dead or it came back
-                // while waiting for the write lock
-                if (!node.IsAlive)
-                    _deadServers[node] = true;
-
-                BuildIndex(_allServers.Except(_deadServers.Keys).ToList());
+                return null;
             }
-            finally
+
+            var node = FindNode(key, snapshot);
+            if (node == null || node.IsAlive)
             {
-                _serverAccessLock.ExitWriteLock();
+                return node;
+            }
+
+            lock (_deadServerLock)
+            {
+                snapshot = Volatile.Read(ref _snapshot);
+                if (snapshot == null)
+                {
+                    return null;
+                }
+
+                // check if it's still dead or it came back while waiting for the lock
+                if (!node.IsAlive && !snapshot.DeadServers.Contains(node))
+                {
+                    var deadServers = new HashSet<IMemcachedNode>(snapshot.DeadServers) { node };
+                    var ringNodes = snapshot.AllServers.Where(n => !deadServers.Contains(n)).ToList();
+                    Interlocked.Exchange(ref _snapshot, BuildSnapshot(snapshot.AllServers, deadServers, ringNodes));
+                }
             }
 
             // try again with the dead server removed from the lists
@@ -125,9 +155,12 @@ namespace Enyim.Caching.Memcached
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        private IMemcachedNode FindNode(string key)
+        private static IMemcachedNode FindNode(string key, LocatorSnapshot snapshot)
         {
-            if (_keys.Length == 0) return null;
+            if (snapshot.Keys.Length == 0)
+            {
+                return null;
+            }
 
             var buf = ArrayPool<byte>.Shared.Rent(key.Length);
             uint itemKeyHash;
@@ -139,9 +172,10 @@ namespace Enyim.Caching.Memcached
             finally
             {
                 ArrayPool<byte>.Shared.Return(buf);
-            } 
+            }
+
             // get the index of the server assigned to this hash
-            int foundIndex = Array.BinarySearch<uint>(_keys, itemKeyHash);
+            int foundIndex = Array.BinarySearch(snapshot.Keys, itemKeyHash);
 
             // no exact match
             if (foundIndex < 0)
@@ -152,19 +186,21 @@ namespace Enyim.Caching.Memcached
                 if (foundIndex == 0)
                 {
                     // it's smaller than everything, so use the last server (with the highest key)
-                    foundIndex = _keys.Length - 1;
+                    foundIndex = snapshot.Keys.Length - 1;
                 }
-                else if (foundIndex >= _keys.Length)
+                else if (foundIndex >= snapshot.Keys.Length)
                 {
                     // the key was larger than all server keys, so return the first server
                     foundIndex = 0;
                 }
             }
 
-            if (foundIndex < 0 || foundIndex > _keys.Length)
+            if (foundIndex < 0 || foundIndex > snapshot.Keys.Length)
+            {
                 return null;
+            }
 
-            return _servers[_keys[foundIndex]];
+            return snapshot.Servers[snapshot.Keys[foundIndex]];
         }
 
         private static uint[] GenerateKeys(IMemcachedNode node, int numberOfKeys)
@@ -200,26 +236,12 @@ namespace Enyim.Caching.Memcached
 
         void IDisposable.Dispose()
         {
-            using (_serverAccessLock)
+            lock (_deadServerLock)
             {
-                _serverAccessLock.EnterWriteLock();
-
-                try
-                {
-                    // kill all pending operations (with an exception)
-                    // it's not nice, but disposeing an instance while being used is bad practice
-                    _allServers = null;
-                    _servers = null;
-                    _keys = null;
-                    _deadServers = null;
-                }
-                finally
-                {
-                    _serverAccessLock.ExitWriteLock();
-                }
+                // kill all pending operations (with an exception)
+                // it's not nice, but disposeing an instance while being used is bad practice
+                Interlocked.Exchange(ref _snapshot, null);
             }
-
-            _serverAccessLock = null;
         }
 
         #endregion
