@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Collections.Pooled;
 using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached.Results.Extensions;
 
@@ -20,43 +18,36 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override IList<ArraySegment<byte>> GetBuffer()
         {
-            // gets key1 key2 key3 ... keyN\r\n
 #if NET8_0_OR_GREATER
-            var command = TextSocketHelper.CreateMultiGetCommand(CommandStr, Keys);
+            return TextSocketHelper.GetCommandBufferMultiGet(CommandStr, Keys);
 #else
             var command = CommandStr + String.Join(" ", Keys.ToArray()) + TextSocketHelper.CommandTerminator;
-#endif
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
         {
-            using (var retval = new PooledDictionary<string, CacheItem>())
-            using (var cas = new PooledDictionary<string, ulong>())
+            _result = new Dictionary<string, CacheItem>();
+            Cas = new Dictionary<string, ulong>();
+
+            try
             {
-                try
-                {
-                    GetResponse r;
+                GetResponse r;
 
-                    while ((r = GetHelper.ReadItem(socket)) != null)
-                    {
-                        var key = r.Key;
-
-                        retval[key] = r.Item;
-                        cas[key] = r.CasValue;
-                    }
-                }
-                catch (NotSupportedException)
+                while ((r = GetHelper.ReadItem(socket)) != null)
                 {
-                    throw;
+                    _result[r.Key] = r.Item;
+                    Cas[r.Key] = r.CasValue;
                 }
-                catch (Exception e)
-                {
-                    _log.Error(e);
-                }
-
-                _result = new Dictionary<string, CacheItem>(retval);
-                Cas = new Dictionary<string, ulong>(cas);
+            }
+            catch (NotSupportedException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                _log.Error(e);
             }
 
             return new TextOperationResult().Pass();
@@ -69,32 +60,26 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override ValueTask<IOperationResult> ReadResponseAsync(PooledSocket socket)
         {
-            using (var retval = new PooledDictionary<string, CacheItem>())
-            using (var cas = new PooledDictionary<string, ulong>())
+            _result = new Dictionary<string, CacheItem>();
+            Cas = new Dictionary<string, ulong>();
+
+            try
             {
-                try
-                {
-                    GetResponse r;
+                GetResponse r;
 
-                    while ((r = GetHelper.ReadItem(socket)) != null)
-                    {
-                        var key = r.Key;
-
-                        retval[key] = r.Item;
-                        cas[key] = r.CasValue;
-                    }
-                }
-                catch (NotSupportedException)
+                while ((r = GetHelper.ReadItem(socket)) != null)
                 {
-                    throw;
+                    _result[r.Key] = r.Item;
+                    Cas[r.Key] = r.CasValue;
                 }
-                catch (Exception e)
-                {
-                    _log.Error(e);
-                }
-
-                _result = new Dictionary<string, CacheItem>(retval);
-                Cas = new Dictionary<string, ulong>(cas);
+            }
+            catch (NotSupportedException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                _log.Error(e);
             }
 
             return new ValueTask<IOperationResult>(new TextOperationResult().Pass());

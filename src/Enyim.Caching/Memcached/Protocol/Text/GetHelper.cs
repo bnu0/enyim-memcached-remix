@@ -6,68 +6,77 @@ namespace Enyim.Caching.Memcached.Protocol.Text
     internal static class GetHelper
     {
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(GetHelper));
+        private static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
+        private static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
 
         public static void FinishCurrent(PooledSocket socket)
         {
             string response = TextSocketHelper.ReadResponse(socket);
 
             if (String.Compare(response, "END", StringComparison.Ordinal) != 0)
+            {
                 throw new MemcachedClientException("No END was received.");
+            }
         }
 
         public static GetResponse ReadItem(PooledSocket socket)
         {
-            (string[] parts, int count) = TextSocketHelper.ReadResponseParts(socket);
-
-            if (count == 1 && String.Compare(parts[0], "END", StringComparison.Ordinal) == 0)
+            if (!TextSocketHelper.TryReadResponseLine(socket, out var line))
+            {
                 return null;
+            }
 
-            var totalLenth = 0;
-            foreach(var part in parts)
+            try
             {
-                if (part != null)
+                if (line.PartCount == 1 && line.GetPart(0).SequenceEqual(EndToken))
                 {
-                    totalLenth += part.Length;
+                    return null;
                 }
+
+                if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
+                {
+                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n" + MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
+                }
+
+                ulong cas = 0;
+                if (line.PartCount == 5)
+                {
+                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out cas))
+                    {
+                        throw new MemcachedClientException("Invalid CAS VALUE received.");
+                    }
+                }
+
+                if (!MemcachedResponseLine.TryParseUInt16(line.GetPart(2), out ushort flags))
+                {
+                    throw new MemcachedClientException("Invalid flags VALUE received.");
+                }
+
+                if (!MemcachedResponseLine.TryParseInt32(line.GetPart(3), out int length))
+                {
+                    throw new MemcachedClientException("Invalid length VALUE received.");
+                }
+
+                byte[] allData = new byte[length];
+                var eod = new byte[2];
+
+                socket.Read(allData, 0, length);
+                socket.Read(eod, 0, 2);
+
+                string key = MemcachedResponseLine.GetAsciiString(line.GetPart(1));
+                GetResponse retval = new GetResponse(key, flags, cas, allData);
+
+                if (log.IsDebugEnabled)
+                {
+                    log.DebugFormat("Received value. Data type: {0}, size: {1}.", retval.Item.Flags, retval.Item.Data.Count);
+                }
+
+                return retval;
             }
-
-            if (totalLenth < 6 || String.Compare(parts[0], 0, "VALUE", 0, 5, StringComparison.Ordinal) != 0)
-                throw new MemcachedClientException($"No VALUE response received ({count} parts).\r\n" + string.Join(" ", parts));
-
-            ulong cas = 0;
-
-            // response is:
-            // VALUE <key> <flags> <bytes> [<cas unique>]
-            // 0     1     2       3       4
-            //
-            // cas only exists in 1.2.4+
-            //
-            if (count == 5)
+            finally
             {
-                if (!UInt64.TryParse(parts[4], out cas))
-                    throw new MemcachedClientException("Invalid CAS VALUE received.");
-
+                System.Buffers.ArrayPool<byte>.Shared.Return(line.Buffer);
             }
-            else if (count < 4)
-            {
-                throw new MemcachedClientException("Invalid VALUE response received: " + string.Join(" ", parts));
-            }
-
-            ushort flags = UInt16.Parse(parts[2], CultureInfo.InvariantCulture);
-            int length = Int32.Parse(parts[3], CultureInfo.InvariantCulture);
-
-            byte[] allData = new byte[length];
-            byte[] eod = new byte[2];
-
-            socket.Read(allData, 0, length);
-            socket.Read(eod, 0, 2); // data is terminated by \r\n
-
-            GetResponse retval = new GetResponse(parts[1], flags, cas, allData);
-
-            if (log.IsDebugEnabled)
-                log.DebugFormat("Received value. Data type: {0}, size: {1}.", retval.Item.Flags, retval.Item.Data.Count);
-
-            return retval;
         }
     }
 

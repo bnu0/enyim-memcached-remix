@@ -22,16 +22,15 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         protected internal override IList<ArraySegment<byte>> GetBuffer()
         {
 #if NET8_0_OR_GREATER
-            var command = string.IsNullOrEmpty(_type)
-                ? TextSocketHelper.CreateCommand("stats")
-                : TextSocketHelper.CreateCommand("stats ", _type);
+            return string.IsNullOrEmpty(_type)
+                ? TextCommandBuffer.FromPrefixSuffix("stats", ReadOnlySpan<char>.Empty)
+                : TextSocketHelper.GetCommandBufferPrefixSuffix("stats ", _type);
 #else
             var command = string.IsNullOrEmpty(_type)
                             ? "stats" + TextSocketHelper.CommandTerminator
                             : "stats " + _type + TextSocketHelper.CommandTerminator;
-#endif
-
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)

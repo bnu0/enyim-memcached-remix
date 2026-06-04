@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Enyim.Caching.Memcached.Results;
@@ -12,7 +13,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         protected internal override IList<System.ArraySegment<byte>> GetBuffer()
         {
 #if NET8_0_OR_GREATER
-            return TextSocketHelper.GetCommandBuffer(TextSocketHelper.CreateCommand("flush_all"));
+            return TextCommandBuffer.FromPrefixSuffix("flush_all", ReadOnlySpan<char>.Empty);
 #else
             return TextSocketHelper.GetCommandBuffer("flush_all" + TextSocketHelper.CommandTerminator);
 #endif

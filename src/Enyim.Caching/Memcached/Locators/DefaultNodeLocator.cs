@@ -159,14 +159,7 @@ namespace Enyim.Caching.Memcached
                 return null;
             }
 
-            ReadOnlySpan<char> keySpan = key.AsSpan();
-            Span<byte> keyBytes = stackalloc byte[keySpan.Length];
-            for (int i = 0; i < keySpan.Length; i++)
-            {
-                keyBytes[i] = (byte)keySpan[i];
-            }
-
-            uint itemKeyHash = FNV1a.Hash(keyBytes);
+            uint itemKeyHash = FNV1a.HashAscii(key.AsSpan());
 
             // get the index of the server assigned to this hash
             int foundIndex = Array.BinarySearch(snapshot.Keys, itemKeyHash);

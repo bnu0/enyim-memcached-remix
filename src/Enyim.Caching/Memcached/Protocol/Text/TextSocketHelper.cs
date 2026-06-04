@@ -78,75 +78,181 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         
         public static (string[], int) ReadResponseParts(PooledSocket socket)
         {
+            if (!TryReadResponseLine(socket, out var line))
+            {
+                return (Array.Empty<string>(), 0);
+            }
+
+            try
+            {
+                if (log.IsDebugEnabled)
+                {
+                    log.Debug("Received response: " + MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
+                }
+
+                ValidateResponseLine(line);
+
+                var ret = new string[line.PartCount];
+                for (int i = 0; i < line.PartCount; i++)
+                {
+                    ret[i] = MemcachedResponseLine.GetAsciiString(line.GetPart(i));
+                }
+
+                return (ret, line.PartCount);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(line.Buffer);
+            }
+        }
+
+        internal static bool TryReadResponseLine(PooledSocket socket, out MemcachedResponseLine line)
+        {
+            line = default;
             var ms = ReadSocketContet(socket);
             if (ms == null)
             {
-                return (Array.Empty<string>(), 0);
+                return false;
             }
 
             var buff = ArrayPool<byte>.Shared.Rent(ms.Length);
             try
             {
-                buff = ms.ToArray(buff);
-
-                if (log.IsDebugEnabled)
-                    log.Debug("Received response: " + Encoding.ASCII.GetString(buff, 0, ms.Length));
-
-                if (ms.Length == 0)
-                    throw new MemcachedClientException("Empty response received.");
-
-                if (ms.Length >= GenericErrorResponseBytes.Length && buff.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
-                    throw new NotSupportedException(
-                        "Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
-
-                if (ms.Length >= ErrorResponseLength)
+                ms.ToArray(buff);
+                if (!TryParseResponseLine(buff, ms.Length, out line))
                 {
-                    if (buff.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
-                    {
-                        throw new MemcachedClientException(Encoding.ASCII.GetString(buff, ErrorResponseLength,
-                            ms.Length - ErrorResponseLength));
-                    }
-                    else if (buff.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
-                    {
-                        throw new MemcachedException(Encoding.ASCII.GetString(buff, 0, ErrorResponseLength));
-                    }
+                    ArrayPool<byte>.Shared.Return(buff);
+                    return false;
                 }
 
-                var lastIndex = 0;
-                var partCount = 0;
-                var ret = new string[5];
-                for (var i = 0; i < ms.Length; i++)
-                {
-                    if (partCount >= 5)
-                    {
-                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
-                    }
-
-                    if (buff[i] == 0x20) // ascii blank space
-                    {
-                        ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, i - lastIndex);
-                        partCount++;
-                        lastIndex = i + 1;
-                    }
-                }
-
-                // capture last token
-                if (lastIndex < ms.Length)
-                {
-                    if (partCount >= ret.Length)
-                    {
-                        throw new MemcachedException("Found too many parts\r\n" + ms.ConvertToAscii());
-                    }
-                    ret[partCount] = Encoding.ASCII.GetString(buff, lastIndex, ms.Length - lastIndex);
-                    partCount++;
-                }
-
-                return (ret, partCount);
+                return true;
             }
             finally
             {
-                ArrayPool<byte>.Shared.Return(buff);
                 SegmentedMemoryStreamPool.Return(ms);
+            }
+        }
+
+        private static void ValidateResponseLine(in MemcachedResponseLine line)
+        {
+            if (line.Length == 0)
+            {
+                throw new MemcachedClientException("Empty response received.");
+            }
+
+            if (line.Length >= GenericErrorResponseBytes.Length
+                && line.Buffer.AsSpan(0, GenericErrorResponseBytes.Length).SequenceEqual(GenericErrorResponseBytes))
+            {
+                throw new NotSupportedException(
+                    "Operation is not supported by the server or the request was malformed. If the latter please report the bug to the developers.");
+            }
+
+            if (line.Length >= ErrorResponseLength)
+            {
+                if (line.Buffer.AsSpan(0, ClientErrorResponseBytes.Length).SequenceEqual(ClientErrorResponseBytes))
+                {
+                    throw new MemcachedClientException(MemcachedResponseLine.GetAsciiString(
+                        line.Buffer.AsSpan(ErrorResponseLength, line.Length - ErrorResponseLength)));
+                }
+
+                if (line.Buffer.AsSpan(0, ServerErrorResponseBytes.Length).SequenceEqual(ServerErrorResponseBytes))
+                {
+                    throw new MemcachedException(MemcachedResponseLine.GetAsciiString(
+                        line.Buffer.AsSpan(0, ErrorResponseLength)));
+                }
+            }
+        }
+
+        private static bool TryParseResponseLine(byte[] buffer, int length, out MemcachedResponseLine line)
+        {
+            int partCount = 0;
+            int part0Start = 0, part0Length = 0;
+            int part1Start = 0, part1Length = 0;
+            int part2Start = 0, part2Length = 0;
+            int part3Start = 0, part3Length = 0;
+            int part4Start = 0, part4Length = 0;
+            int lastIndex = 0;
+
+            for (int i = 0; i < length; i++)
+            {
+                if (partCount >= 5)
+                {
+                    throw new MemcachedException("Found too many parts\r\n" + Encoding.ASCII.GetString(buffer, 0, length));
+                }
+
+                if (buffer[i] == 0x20)
+                {
+                    AssignPart(partCount, lastIndex, i - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
+                    partCount++;
+                    lastIndex = i + 1;
+                }
+            }
+
+            if (lastIndex < length)
+            {
+                if (partCount >= 5)
+                {
+                    throw new MemcachedException("Found too many parts\r\n" + Encoding.ASCII.GetString(buffer, 0, length));
+                }
+
+                AssignPart(partCount, lastIndex, length - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
+                partCount++;
+            }
+
+            line = new MemcachedResponseLine(
+                buffer,
+                length,
+                partCount,
+                part0Start,
+                part0Length,
+                part1Start,
+                part1Length,
+                part2Start,
+                part2Length,
+                part3Start,
+                part3Length,
+                part4Start,
+                part4Length);
+            return true;
+        }
+
+        private static void AssignPart(
+            int partCount,
+            int start,
+            int length,
+            ref int part0Start,
+            ref int part0Length,
+            ref int part1Start,
+            ref int part1Length,
+            ref int part2Start,
+            ref int part2Length,
+            ref int part3Start,
+            ref int part3Length,
+            ref int part4Start,
+            ref int part4Length)
+        {
+            switch (partCount)
+            {
+                case 0:
+                    part0Start = start;
+                    part0Length = length;
+                    break;
+                case 1:
+                    part1Start = start;
+                    part1Length = length;
+                    break;
+                case 2:
+                    part2Start = start;
+                    part2Length = length;
+                    break;
+                case 3:
+                    part3Start = start;
+                    part3Length = length;
+                    break;
+                case 4:
+                    part4Start = start;
+                    part4Length = length;
+                    break;
             }
         }
 
@@ -345,19 +451,34 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         /// and use the <see cref="M:Enyim.Caching.Memcached.PooledSocket.Write(IList&lt;ArraySegment&lt;byte&gt;&gt;)"/> to send the command and the additional buffers in one transaction.</remarks>
         public unsafe static IList<ArraySegment<byte>> GetCommandBuffer(string value)
         {
-            var data = new ArraySegment<byte>(Encoding.ASCII.GetBytes(value));
-
-            return new ArraySegment<byte>[] { data };
+            return TextCommandBuffer.FromString(value);
         }
 
         public unsafe static IList<ArraySegment<byte>> GetCommandBuffer(string value, IList<ArraySegment<byte>> list)
         {
-            var data = new ArraySegment<byte>(Encoding.ASCII.GetBytes(value));
-
-            list.Add(data);
-
-            return list;
+            return TextCommandBuffer.FromString(value, list);
         }
+
+#if NET8_0_OR_GREATER
+        internal static IList<ArraySegment<byte>> GetCommandBufferPrefixSuffix(ReadOnlySpan<char> prefix, ReadOnlySpan<char> suffix)
+        {
+            return TextCommandBuffer.FromPrefixSuffix(prefix, suffix);
+        }
+
+        internal static IList<ArraySegment<byte>> GetCommandBufferPrefixPartSeparatorPart(
+            ReadOnlySpan<char> prefix,
+            ReadOnlySpan<char> part1,
+            ReadOnlySpan<char> separator,
+            ReadOnlySpan<char> part2)
+        {
+            return TextCommandBuffer.FromPrefixPartSeparatorPart(prefix, part1, separator, part2);
+        }
+
+        internal static IList<ArraySegment<byte>> GetCommandBufferMultiGet(ReadOnlySpan<char> commandPrefix, IList<string> keys)
+        {
+            return TextCommandBuffer.FromMultiGet(commandPrefix, keys);
+        }
+#endif
 
     }
 }

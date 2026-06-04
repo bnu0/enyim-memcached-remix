@@ -30,7 +30,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         {
 #if NET8_0_OR_GREATER
             var commandPrefix = _mode == MutationMode.Increment ? "incr " : "decr ";
-            var command = TextSocketHelper.CreateCommand(
+            return TextSocketHelper.GetCommandBufferPrefixPartSeparatorPart(
                 commandPrefix,
                 Key,
                 " ",
@@ -41,9 +41,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                             + " "
                             + _delta.ToString(CultureInfo.InvariantCulture)
                             + TextSocketHelper.CommandTerminator;
-#endif
-
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
