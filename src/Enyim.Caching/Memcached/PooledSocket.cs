@@ -27,7 +27,7 @@ namespace Enyim.Caching.Memcached
         private NetworkStream _inputStream;
         private SslStream _sslStream;
 
-        private const int ReadBufferSize = 512;
+        private const int ReadBufferSize = 8192;
         private readonly byte[] _readBuffer = new byte[ReadBufferSize];
         private int _readBufferOffset;
         private int _readBufferCount;
