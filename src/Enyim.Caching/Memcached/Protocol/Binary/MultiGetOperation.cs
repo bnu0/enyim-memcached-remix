@@ -107,8 +107,8 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
             var result = new TextOperationResult();
             var response = new BinaryResponse();
@@ -148,8 +148,8 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
         protected internal override async ValueTask<IOperationResult> ReadResponseAsync(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
             var result = new TextOperationResult();
             var response = new BinaryResponse();
