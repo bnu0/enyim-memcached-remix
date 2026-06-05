@@ -1,5 +1,6 @@
 using System;
-using System.Globalization;
+using System.Buffers;
+using System.Collections.Generic;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
@@ -8,6 +9,12 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(GetHelper));
         private static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
         private static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
+
+        internal enum ReadItemStatus
+        {
+            End,
+            ItemRead,
+        }
 
         public static void FinishCurrent(PooledSocket socket)
         {
@@ -19,29 +26,43 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
         }
 
-        public static GetResponse ReadItem(PooledSocket socket)
+        internal static void ReadItemsInto(
+            PooledSocket socket,
+            IDictionary<string, CacheItem> items,
+            IDictionary<string, ulong> cas)
         {
-            if (!TextSocketHelper.TryReadResponseLine(socket, out var line))
+            ReadItemStatus status;
+            while ((status = ReadItemInto(socket, items, cas)) == ReadItemStatus.ItemRead)
             {
-                return null;
+            }
+        }
+
+        internal static ReadItemStatus ReadItemInto(
+            PooledSocket socket,
+            IDictionary<string, CacheItem> items,
+            IDictionary<string, ulong> cas)
+        {
+            if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
+            {
+                throw new MemcachedClientException("Unexpected end of stream while reading memcached response.");
             }
 
             try
             {
                 if (line.PartCount == 1 && line.GetPart(0).SequenceEqual(EndToken))
                 {
-                    return null;
+                    return ReadItemStatus.End;
                 }
 
                 if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
                 {
-                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n" + MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
+                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n{MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length))}");
                 }
 
-                ulong cas = 0;
+                ulong casValue = 0;
                 if (line.PartCount == 5)
                 {
-                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out cas))
+                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out casValue))
                     {
                         throw new MemcachedClientException("Invalid CAS VALUE received.");
                     }
@@ -57,14 +78,71 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                     throw new MemcachedClientException("Invalid length VALUE received.");
                 }
 
+                string key = MemcachedResponseLine.GetAsciiString(line.GetPart(1));
                 byte[] allData = new byte[length];
-                var eod = new byte[2];
 
-                socket.Read(allData, 0, length);
-                socket.Read(eod, 0, 2);
+                ReadPayloadAndEndMarker(socket, allData, length);
+
+                items[key] = new CacheItem(flags, new ArraySegment<byte>(allData, 0, length));
+                cas[key] = casValue;
+
+                if (log.IsDebugEnabled)
+                {
+                    log.DebugFormat("Received value. Data type: {0}, size: {1}.", flags, length);
+                }
+
+                return ReadItemStatus.ItemRead;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(line.Buffer);
+            }
+        }
+
+        public static GetResponse ReadItem(PooledSocket socket)
+        {
+            if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
+            {
+                return null;
+            }
+
+            try
+            {
+                if (line.PartCount == 1 && line.GetPart(0).SequenceEqual(EndToken))
+                {
+                    return null;
+                }
+
+                if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
+                {
+                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n{MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length))}");
+                }
+
+                ulong casValue = 0;
+                if (line.PartCount == 5)
+                {
+                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out casValue))
+                    {
+                        throw new MemcachedClientException("Invalid CAS VALUE received.");
+                    }
+                }
+
+                if (!MemcachedResponseLine.TryParseUInt16(line.GetPart(2), out ushort flags))
+                {
+                    throw new MemcachedClientException("Invalid flags VALUE received.");
+                }
+
+                if (!MemcachedResponseLine.TryParseInt32(line.GetPart(3), out int length))
+                {
+                    throw new MemcachedClientException("Invalid length VALUE received.");
+                }
 
                 string key = MemcachedResponseLine.GetAsciiString(line.GetPart(1));
-                GetResponse retval = new GetResponse(key, flags, cas, allData);
+                byte[] allData = new byte[length];
+
+                ReadPayloadAndEndMarker(socket, allData, length);
+
+                GetResponse retval = new GetResponse(key, flags, casValue, allData);
 
                 if (log.IsDebugEnabled)
                 {
@@ -75,7 +153,20 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
             finally
             {
-                System.Buffers.ArrayPool<byte>.Shared.Return(line.Buffer);
+                ArrayPool<byte>.Shared.Return(line.Buffer);
+            }
+        }
+
+        private static void ReadPayloadAndEndMarker(PooledSocket socket, byte[] payload, int length)
+        {
+            socket.Read(payload, 0, length);
+
+            var eod = new byte[2];
+            socket.Read(eod, 0, 2);
+
+            if (eod[0] != 13 || eod[1] != 10)
+            {
+                throw new MemcachedClientException("Invalid end marker after memcached value block.");
             }
         }
     }
