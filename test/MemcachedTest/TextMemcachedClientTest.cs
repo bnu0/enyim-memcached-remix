@@ -1,33 +1,43 @@
 using Enyim.Caching;
 using Enyim.Caching.Memcached;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace MemcachedTest
 {
     public class TextMemcachedClientTest : MemcachedClientTest
     {
+        protected override MemcachedClient GetClient(MemcachedProtocol protocol = MemcachedProtocol.Text)
+        {
+            return base.GetClient(MemcachedProtocol.Text);
+        }
+
         [Fact]
         public void IncrementTest()
         {
-            using (MemcachedClient client = GetClient(MemcachedProtocol.Text))
+            using (MemcachedClient client = GetClient())
             {
-                Assert.True(client.Store(StoreMode.Set, "VALUE", "100"), "Initialization failed");
+                var key = "text_increment_" + Guid.NewGuid();
+                Assert.True(client.Store(StoreMode.Set, key, "100"), "Initialization failed");
 
-                Assert.Equal((ulong)102, client.Increment("VALUE", 0, 2));
-                Assert.Equal((ulong)112, client.Increment("VALUE", 0, 10));
+                Assert.Equal((ulong)102, client.Increment(key, 0, 2));
+                Assert.Equal((ulong)112, client.Increment(key, 0, 10));
             }
         }
 
         [Fact]
         public void DecrementTest()
         {
-            using (MemcachedClient client = GetClient(MemcachedProtocol.Text))
+            using (MemcachedClient client = GetClient())
             {
-                client.Store(StoreMode.Set, "VALUE", "100");
+                var key = "text_decrement_" + Guid.NewGuid();
+                client.Store(StoreMode.Set, key, "100");
 
-                Assert.Equal((ulong)98, client.Decrement("VALUE", 0, 2));
-                Assert.Equal((ulong)88, client.Decrement("VALUE", 0, 10));
+                Assert.Equal((ulong)98, client.Decrement(key, 0, 2));
+                Assert.Equal((ulong)88, client.Decrement(key, 0, 10));
             }
         }
 
@@ -64,13 +74,105 @@ namespace MemcachedTest
         [Fact]
         public void StoreWithTimeSpan()
         {
-            using (MemcachedClient client = GetClient(MemcachedProtocol.Text))
+            using (MemcachedClient client = GetClient())
             {
                 var key = "abc";
                 var value = "core memcache write";
                 bool success = client.Store(Enyim.Caching.Memcached.StoreMode.Set, key, value, new TimeSpan(0, 10, 0));
                 Assert.True(success);
                 Assert.Equal(value, client.Get<string>(key));
+            }
+        }
+
+        [Fact]
+        public async Task TextMultiGetTest()
+        {
+            using (var client = GetClient())
+            {
+                var keys = new List<string>();
+
+                for (int i = 0; i < 10; i++)
+                {
+                    string k = $"text_multi_get_{Guid.NewGuid()}_{i}";
+                    keys.Add(k);
+                    Assert.True(await client.StoreAsync(StoreMode.Set, k, i, DateTime.Now.AddSeconds(30)), "Store of " + k + " failed");
+                }
+
+                IDictionary<string, int> results = await client.GetAsync<int>(keys);
+                Assert.Equal(keys.Count, results.Count);
+
+                for (int i = 0; i < keys.Count; i++)
+                {
+                    Assert.True(results.TryGetValue(keys[i], out int value), "missing key: " + keys[i]);
+                    Assert.Equal(i, value);
+                }
+            }
+        }
+
+        [Fact]
+        public async Task TextMultiGetWithCasTest()
+        {
+            using (var client = GetClient())
+            {
+                var keys = new List<string>();
+                for (int i = 0; i < 10; i++)
+                {
+                    string k = $"text_multi_get_cas_{Guid.NewGuid()}_{i}";
+                    keys.Add(k);
+                    Assert.True(await client.StoreAsync(StoreMode.Set, k, i, DateTime.Now.AddSeconds(300)));
+                }
+
+                var results = await client.GetWithCasAsync(keys);
+                Assert.Equal(keys.Count, results.Count);
+
+                foreach (var key in keys)
+                {
+                    Assert.True(results.TryGetValue(key, out var entry));
+                    Assert.NotEqual((ulong)0, entry.Cas);
+                }
+            }
+        }
+
+        [Fact]
+        public async Task TextMultiGetManyKeysTest()
+        {
+            using (var client = GetClient())
+            {
+                const int keyCount = 25;
+                var keys = new List<string>(keyCount);
+                var expected = new Dictionary<string, string>(keyCount);
+
+                for (int i = 0; i < keyCount; i++)
+                {
+                    string key = $"text_bulk_get_{Guid.NewGuid()}_{i}";
+                    string value = $"payload-{i}-{Guid.NewGuid()}";
+                    keys.Add(key);
+                    expected[key] = value;
+                    Assert.True(await client.StoreAsync(StoreMode.Set, key, value, DateTime.Now.AddSeconds(60)));
+                }
+
+                var results = await client.GetAsync<string>(keys);
+                Assert.Equal(keyCount, results.Count);
+
+                foreach (var pair in expected)
+                {
+                    Assert.Equal(pair.Value, results[pair.Key]);
+                }
+            }
+        }
+
+        [Fact]
+        public void TextGetBinaryPayloadTest()
+        {
+            using (var client = GetClient())
+            {
+                var key = $"text_binary_{Guid.NewGuid()}";
+                var payload = Enumerable.Range(0, 256).Select(i => (byte)i).ToArray();
+
+                Assert.True(client.Store(StoreMode.Set, key, payload, TimeSpan.FromMinutes(1)));
+                var roundTrip = client.Get<byte[]>(key);
+
+                Assert.Equal(payload, roundTrip);
             }
         }
     }

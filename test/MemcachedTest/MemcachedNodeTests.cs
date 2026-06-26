@@ -1,4 +1,5 @@
-﻿using Enyim.Caching;
+﻿using Enyim.Caching.TestCommon;
+using Enyim.Caching;
 using Enyim.Caching.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,7 @@ namespace MemcachedTest
             var idleTimeout = TimeSpan.FromSeconds(2);
             services.AddEnyimMemcached(options =>
             {
-                options.AddServer("memcached", 11211);
+                options.AddServer(MemcachedTestHost.Hostname, 11211);
                 options.SocketPool = new SocketPoolOptions
                 {
                     ConnectionIdleTimeout = idleTimeout

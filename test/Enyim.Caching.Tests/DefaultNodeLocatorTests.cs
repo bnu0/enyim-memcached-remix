@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -92,6 +93,122 @@ namespace Enyim.Caching.Tests
             }
             Assert.InRange(maxVariation, 0, 0.20); // variation expected to be less than 20%
         }
+
+        [Fact]
+        public void Locate_ReturnsSameNodeForSameKey()
+        {
+            var nodes = CreateNodes(4);
+            IMemcachedNodeLocator locator = new DefaultNodeLocator();
+            locator.Initialize(nodes);
+
+            const string key = "stable-locator-key";
+            var first = locator.Locate(key);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                Assert.Same(first, locator.Locate(key));
+            }
+        }
+
+        [Fact]
+        public void Locate_ConcurrentReads_ReturnConsistentNode()
+        {
+            var nodes = CreateNodes(6);
+            IMemcachedNodeLocator locator = new DefaultNodeLocator();
+            locator.Initialize(nodes);
+
+            const string key = "concurrent-locator-key";
+            var expected = locator.Locate(key);
+            var exceptions = new List<Exception>();
+            var mismatches = 0;
+
+            Parallel.For(0, 500, _ =>
+            {
+                try
+                {
+                    if (!ReferenceEquals(expected, locator.Locate(key)))
+                    {
+                        Interlocked.Increment(ref mismatches);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lock (exceptions)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }
+            });
+
+            Assert.Empty(exceptions);
+            Assert.Equal(0, mismatches);
+        }
+
+        [Fact]
+        public void Locate_AllDeadNodes_ReturnsNull()
+        {
+            var deadNode = new ControllableMockNode(new IPEndPoint(IPAddress.Parse("10.0.0.99"), 11211), isAlive: false);
+            IMemcachedNodeLocator locator = new DefaultNodeLocator();
+            locator.Initialize(new List<IMemcachedNode> { deadNode });
+
+            Assert.Null(locator.Locate("any-key"));
+        }
+
+        [Fact]
+        public void Locate_WhenMappedNodeIsDead_FallsBackToAliveNode()
+        {
+            var aliveNode = new ControllableMockNode(new IPEndPoint(IPAddress.Parse("10.0.0.11"), 11211), isAlive: true);
+            var deadNode = new ControllableMockNode(new IPEndPoint(IPAddress.Parse("10.0.0.12"), 11211), isAlive: false);
+            IMemcachedNodeLocator locator = new DefaultNodeLocator();
+            locator.Initialize(new List<IMemcachedNode> { aliveNode, deadNode });
+
+            IMemcachedNode resolved = null;
+            for (int i = 0; i < 100000 && !ReferenceEquals(resolved, aliveNode); i++)
+            {
+                resolved = locator.Locate("dead-node-probe-" + i);
+            }
+
+            Assert.Same(aliveNode, resolved);
+            Assert.DoesNotContain(deadNode, locator.GetWorkingNodes());
+        }
+
+        private static List<IMemcachedNode> CreateNodes(int count)
+        {
+            var nodes = new List<IMemcachedNode>(count);
+            for (int i = 0; i < count; i++)
+            {
+                nodes.Add(new MockNode(new IPEndPoint(IPAddress.Parse($"10.0.0.{i + 1}"), 11211)));
+            }
+
+            return nodes;
+        }
+    }
+
+    class ControllableMockNode : IMemcachedNode
+    {
+        public ControllableMockNode(IPEndPoint endpoint, bool isAlive)
+        {
+            EndPoint = endpoint;
+            IsAlive = isAlive;
+        }
+
+        public EndPoint EndPoint { get; }
+
+        public bool IsAlive { get; }
+
+        public event Action<IMemcachedNode> Failed;
+
+        public void Dispose()
+        {
+        }
+
+        public IOperationResult Execute(IOperation op) => throw new NotImplementedException();
+
+        public Task<IOperationResult> ExecuteAsync(IOperation op) => throw new NotImplementedException();
+
+        public Task<bool> ExecuteAsync(IOperation op, Action<bool> next) => throw new NotImplementedException();
+
+        public bool Ping() => IsAlive;
     }
 
     class MockNode : IMemcachedNode

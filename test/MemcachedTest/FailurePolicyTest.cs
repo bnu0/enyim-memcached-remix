@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Enyim.Caching.TestCommon;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,7 +21,7 @@ namespace MemcachedTest
             IServiceCollection services = new ServiceCollection();
             services.AddEnyimMemcached(options =>
             {
-                options.AddServer("memcached", 11212);
+                options.AddServer(MemcachedTestHost.Hostname, 11212);
                 options.Transcoder = "MessagePackTranscoder";
             });
             services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
