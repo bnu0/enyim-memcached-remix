@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Threading;
-using Enyim.Caching.Configuration;
-using Enyim.Collections;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Collections;
 using System.Security;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     /// <summary>
     /// Server pool implementing the binary protocol.
@@ -40,7 +40,7 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
             if (auth != null)
             {
                 Type t = auth.Type;
-                var provider = (t == null) ? null : Enyim.Reflection.FastActivator.Create(t) as ISaslAuthenticationProvider;
+                var provider = (t == null) ? null : EnyimRedux.Reflection.FastActivator.Create(t) as ISaslAuthenticationProvider;
 
                 if (provider != null)
                 {

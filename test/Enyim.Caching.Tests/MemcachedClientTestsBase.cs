@@ -1,8 +1,8 @@
-﻿using Enyim.Caching.Configuration;
-using Enyim.Caching.TestCommon;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Transcoders;
+﻿using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.TestCommon;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Transcoders;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public abstract class MemcachedClientTestsBase
     {

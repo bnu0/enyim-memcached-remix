@@ -1,11 +1,11 @@
 using System;
 using System.Text;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Helpers;
-using Enyim.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Helpers;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public class StoreOperation : BinarySingleItemOperation, IStoreOperation
     {

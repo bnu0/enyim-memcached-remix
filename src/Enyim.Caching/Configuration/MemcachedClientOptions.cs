@@ -1,10 +1,10 @@
-﻿using Enyim.Caching.Memcached;
+﻿using EnyimRedux.Caching.Memcached;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Net.Security;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     public class MemcachedClientOptions : IOptions<MemcachedClientOptions>
     {

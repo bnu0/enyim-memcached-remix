@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Security.Cryptography;
 
-namespace Enyim
+namespace EnyimRedux
 {
     /// <summary>
     ///	This is Jenkin's "One at A time Hash".

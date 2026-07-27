@@ -1,5 +1,5 @@
 
-namespace Enyim.Reflection
+namespace EnyimRedux.Reflection
 {
 	public interface IFastObjectFacory
 	{

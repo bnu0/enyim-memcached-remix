@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public static class BinaryConverter
     {

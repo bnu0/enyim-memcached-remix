@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Results.StatusCodes
+namespace EnyimRedux.Caching.Memcached.Results.StatusCodes
 {
 	public enum StatusCodeEnums
 	{

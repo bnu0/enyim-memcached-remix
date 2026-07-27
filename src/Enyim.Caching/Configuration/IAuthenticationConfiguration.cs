@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
 	/// <summary>
 	/// Defines an interface for configuring the authentication paramaters the <see cref="T:MemcachedClient"/>.
@@ -9,7 +9,7 @@ namespace Enyim.Caching.Configuration
 	public interface IAuthenticationConfiguration
 	{
 		/// <summary>
-		/// Gets or sets the type of the <see cref="T:Enyim.Caching.Memcached.IAuthenticationProvider"/> which will be used authehticate the connections to the Memcached nodes.
+		/// Gets or sets the type of the <see cref="T:EnyimRedux.Caching.Memcached.IAuthenticationProvider"/> which will be used authehticate the connections to the Memcached nodes.
 		/// </summary>
 		Type Type { get; set; }
 

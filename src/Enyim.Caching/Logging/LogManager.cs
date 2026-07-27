@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
 	/// <summary>
 	/// Creates loggers based on the current configuration.
@@ -12,11 +12,11 @@ namespace Enyim.Caching
 	/// <configuration>
 	///		<configSections>
 	///			<sectionGroup name="enyim.com">
-	///				<section name="log" type="Enyim.Caching.EnyimLoggerSection, Enyim.Caching" />
+	///				<section name="log" type="EnyimRedux.Caching.EnyimLoggerSection, EnyimRedux.Caching" />
 	///			</sectionGroup>
 	///		</configSections>
 	///		<enyim.com>
-	///			<log factory="Enyim.Caching.Log4NetLoggerFactory, Enyim.Caching" />
+	///			<log factory="EnyimRedux.Caching.Log4NetLoggerFactory, EnyimRedux.Caching" />
 	///		</enyim.com>
 	/// </configuration>
 	/// 
@@ -37,12 +37,12 @@ namespace Enyim.Caching
 #else
             factory = new NullLoggerFactory();
 #endif
-            //			var section = ConfigurationManager.GetSection("enyim.com/log") as Enyim.Caching.Configuration.LoggerSection;
+            //			var section = ConfigurationManager.GetSection("enyim.com/log") as EnyimRedux.Caching.Configuration.LoggerSection;
             //			ILogFactory f = null;
 
             //			if (section != null && section.LogFactory != null)
             //			{
-            //				f = Enyim.Reflection.FastActivator.Create(section.LogFactory) as ILogFactory;
+            //				f = EnyimRedux.Reflection.FastActivator.Create(section.LogFactory) as ILogFactory;
             //			}
             //#if !log4net
             //			// use an empty logger if nothing is specified in the app.config

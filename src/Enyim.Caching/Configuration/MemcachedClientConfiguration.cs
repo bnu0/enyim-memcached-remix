@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using Enyim.Caching.Memcached;
-using Enyim.Reflection;
-using Enyim.Caching.Memcached.Protocol.Binary;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Reflection;
+using EnyimRedux.Caching.Memcached.Protocol.Binary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using System.Linq;
 using System.Net.Sockets;
-using Enyim.Caching.Memcached.Transcoders;
+using EnyimRedux.Caching.Memcached.Transcoders;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     /// <summary>
     /// Configuration class
@@ -157,11 +157,11 @@ namespace Enyim.Caching.Configuration
                 {
                     if (options.Transcoder == nameof(BinaryFormatterTranscoder))
                     {
-                        options.Transcoder = "Enyim.Caching.Memcached.Transcoders.BinaryFormatterTranscoder";
+                        options.Transcoder = "EnyimRedux.Caching.Memcached.Transcoders.BinaryFormatterTranscoder";
                     }
                     else if (options.Transcoder == nameof(MessagePackTranscoder))
                     {
-                        options.Transcoder = "Enyim.Caching.Memcached.Transcoders.MessagePackTranscoder";
+                        options.Transcoder = "EnyimRedux.Caching.Memcached.Transcoders.MessagePackTranscoder";
                     }
 
                     var transcoderType = Type.GetType(options.Transcoder);
@@ -258,7 +258,7 @@ namespace Enyim.Caching.Configuration
         public IAuthenticationConfiguration Authentication { get; private set; }
 
         /// <summary>
-        /// Gets or sets the <see cref="T:Enyim.Caching.Memcached.IMemcachedKeyTransformer"/> which will be used to convert item keys for Memcached.
+        /// Gets or sets the <see cref="T:EnyimRedux.Caching.Memcached.IMemcachedKeyTransformer"/> which will be used to convert item keys for Memcached.
         /// </summary>
         public IMemcachedKeyTransformer KeyTransformer
         {
@@ -267,7 +267,7 @@ namespace Enyim.Caching.Configuration
         }
 
         /// <summary>
-        /// Gets or sets the Type of the <see cref="T:Enyim.Caching.Memcached.IMemcachedNodeLocator"/> which will be used to assign items to Memcached nodes.
+        /// Gets or sets the Type of the <see cref="T:EnyimRedux.Caching.Memcached.IMemcachedNodeLocator"/> which will be used to assign items to Memcached nodes.
         /// </summary>
         /// <remarks>If both <see cref="M:NodeLocator"/> and  <see cref="M:NodeLocatorFactory"/> are assigned then the latter takes precedence.</remarks>
         public Type NodeLocator
@@ -287,7 +287,7 @@ namespace Enyim.Caching.Configuration
         public IProviderFactory<IMemcachedNodeLocator> NodeLocatorFactory { get; set; }
 
         /// <summary>
-        /// Gets or sets the <see cref="T:Enyim.Caching.Memcached.ITranscoder"/> which will be used serialize or deserialize items.
+        /// Gets or sets the <see cref="T:EnyimRedux.Caching.Memcached.ITranscoder"/> which will be used serialize or deserialize items.
         /// </summary>
         public ITranscoder Transcoder
         {

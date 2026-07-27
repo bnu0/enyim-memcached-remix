@@ -1,13 +1,13 @@
 using System;
 using System.Linq;
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached;
 using System.Collections.Generic;
 using System.Threading;
 using System.Net;
 using System.Diagnostics;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public class CountdownEvent : IDisposable
     {

@@ -1,4 +1,4 @@
-﻿using Enyim.Caching;
+﻿using EnyimRedux.Caching;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

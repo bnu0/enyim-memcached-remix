@@ -1,4 +1,4 @@
-using Enyim.Caching;
+using EnyimRedux.Caching;
 using Microsoft.Extensions.Caching.Distributed;
 using Xunit.Priority;
 

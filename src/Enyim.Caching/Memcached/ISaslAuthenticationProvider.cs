@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// Provides the base interface for Memcached SASL authentication.

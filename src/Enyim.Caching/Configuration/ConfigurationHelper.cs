@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Reflection;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     public static class ConfigurationHelper
     {

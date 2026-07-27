@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Net;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Represents the statistics of a Memcached node.

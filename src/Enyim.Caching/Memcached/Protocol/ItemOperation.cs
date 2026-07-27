@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace Enyim.Caching.Memcached.Protocol
+namespace EnyimRedux.Caching.Memcached.Protocol
 {
     /// <summary>
     /// Base class for implementing operations working with keyed items.

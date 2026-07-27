@@ -1,10 +1,10 @@
 using System;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Caching.Memcached.Results.Helpers;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results.Helpers;
+using EnyimRedux.Caching.Memcached.Results;
 using System.Buffers.Binary;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public class MutatorOperation : BinarySingleItemOperation, IMutatorOperation
     {

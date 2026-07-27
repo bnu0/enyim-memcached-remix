@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class MemcachedClientConcatTests : MemcachedClientTestsBase
     {

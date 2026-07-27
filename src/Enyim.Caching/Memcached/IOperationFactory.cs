@@ -1,9 +1,9 @@
 using System;
 using System.Net;
 using System.Collections.Generic;
-using Enyim.Caching.Memcached.Protocol;
+using EnyimRedux.Caching.Memcached.Protocol;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     public interface IOperationFactory
     {

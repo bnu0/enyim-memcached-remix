@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
 	/// <summary>
 	/// A fast comparer for dictionaries indexed by UInt. Faster than using Comparer.Default

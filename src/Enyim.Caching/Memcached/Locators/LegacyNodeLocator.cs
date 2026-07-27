@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// This is a ketama-like consistent hashing based node locator. Used when no other <see cref="T:IMemcachedNodeLocator"/> is specified for the pool.

@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public class MemcachedClient<T> : IMemcachedClient<T>
     {

@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Security;
 using System.Threading;
-using Enyim.Caching.Configuration;
-using Enyim.Collections;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Collections;
 using System.Security;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     /// <summary>
     /// A node which is used by the BinaryPool. It implements the binary protocol's SASL auth. mechanism.

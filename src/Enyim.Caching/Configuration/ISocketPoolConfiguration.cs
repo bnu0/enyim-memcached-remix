@@ -1,7 +1,7 @@
 using System;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Memcached;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     /// <summary>
     /// Defines an interface for configuring the socket pool for the <see cref="T:MemcachedClient"/>.

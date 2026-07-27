@@ -1,6 +1,6 @@
-using Enyim.Caching.TestCommon;
-using Enyim.Caching;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.TestCommon;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.Memcached;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;

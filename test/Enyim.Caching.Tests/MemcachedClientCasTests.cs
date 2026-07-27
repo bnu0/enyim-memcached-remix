@@ -1,10 +1,10 @@
-﻿using Enyim.Caching.Memcached;
+﻿using EnyimRedux.Caching.Memcached;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class MemcachedClientCasTests : MemcachedClientTestsBase
     {

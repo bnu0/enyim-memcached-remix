@@ -1,10 +1,10 @@
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Memcached;
 using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public partial class MemcachedClient
     {

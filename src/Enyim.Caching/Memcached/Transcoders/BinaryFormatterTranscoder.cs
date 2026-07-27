@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Transcoders
+namespace EnyimRedux.Caching.Memcached.Transcoders
 {
     public class BinaryFormatterTranscoder : DefaultTranscoder
     {

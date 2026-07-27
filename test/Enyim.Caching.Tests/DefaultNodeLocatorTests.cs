@@ -1,5 +1,5 @@
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class DefaultNodeLocatorTest
     {

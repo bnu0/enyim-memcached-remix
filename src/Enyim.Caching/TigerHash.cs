@@ -1,7 +1,7 @@
 using System;
 using System.Security.Cryptography;
 
-namespace Enyim
+namespace EnyimRedux
 {
     /// <summary>
     /// Implements the Tiger hash. (http://www.cs.technion.ac.il/~biham/Reports/Tiger/)

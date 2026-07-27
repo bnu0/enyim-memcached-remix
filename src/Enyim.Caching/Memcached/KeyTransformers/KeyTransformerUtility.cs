@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached.KeyTransformers
+namespace EnyimRedux.Caching.Memcached.KeyTransformers
 {
     public static class KeyTransformerUtility
     {

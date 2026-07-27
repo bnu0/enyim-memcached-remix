@@ -1,6 +1,6 @@
 #if NET8_0_OR_GREATER
-using Enyim.Caching;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.Memcached;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

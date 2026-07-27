@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// A key transformer which converts the item keys into Base64.

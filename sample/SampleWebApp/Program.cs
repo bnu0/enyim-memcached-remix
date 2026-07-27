@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 
-namespace Enyim.Caching.SampleWebApp
+namespace EnyimRedux.Caching.SampleWebApp
 {
     public class Program
     {

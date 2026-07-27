@@ -1,11 +1,11 @@
 using System;
 using System.Net;
 using System.Collections.Generic;
-using Enyim.Caching.Memcached.Protocol;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Protocol;
+using EnyimRedux.Caching.Memcached.Results;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     public interface IMemcachedNode : IDisposable
     {

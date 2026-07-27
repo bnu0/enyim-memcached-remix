@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Results
+namespace EnyimRedux.Caching.Memcached.Results
 {
 	public interface IRemoveOperationResult : IOperationResult
 	{

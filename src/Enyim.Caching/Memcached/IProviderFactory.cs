@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Provides a way for custom initalization of the providers (locators, transcoders, key transformers)

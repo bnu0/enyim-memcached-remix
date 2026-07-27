@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.IO;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public class DiagnosticsLogFactory : ILogFactory
     {
@@ -17,7 +17,7 @@ namespace Enyim.Caching
         {
             if (string.IsNullOrEmpty(logPath))
                 throw new ArgumentNullException(
-                    "Log path must be defined.  Add the following to configuration/appSettings: <add key=\"Enyim.Caching.Diagnostics.LogPath\" "
+                    "Log path must be defined.  Add the following to configuration/appSettings: <add key=\"EnyimRedux.Caching.Diagnostics.LogPath\" "
                     + "value=\"path to the log file\" /> or specify a valid path in in the constructor.");
 
             _writer = new StreamWriter(new FileStream(logPath, FileMode.OpenOrCreate));

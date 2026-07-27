@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// This is a simple node locator with no computation overhead, always returns the first server from the list. Use only in single server deployments.

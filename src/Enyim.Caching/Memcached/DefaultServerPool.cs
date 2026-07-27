@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Threading;
-using Enyim.Caching.Configuration;
+using EnyimRedux.Caching.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     public class DefaultServerPool : IServerPool, IDisposable
     {

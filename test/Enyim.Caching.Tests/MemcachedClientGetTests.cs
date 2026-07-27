@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results.StatusCodes;
+using EnyimRedux.Caching.Memcached.Results.StatusCodes;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class MemcachedClientGetTests : MemcachedClientTestsBase
     {

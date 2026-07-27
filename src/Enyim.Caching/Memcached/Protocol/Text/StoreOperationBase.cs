@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     public class StoreOperationBase : SingleItemOperation
     {

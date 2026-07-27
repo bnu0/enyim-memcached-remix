@@ -1,7 +1,7 @@
-using Enyim.Caching.Memcached.Protocol.Binary;
+using EnyimRedux.Caching.Memcached.Protocol.Binary;
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     public enum MutationMode : byte { Increment = 0x05, Decrement = 0x06, Touch = OpCode.Touch };
     public enum ConcatenationMode : byte { Append = 0x0E, Prepend = 0x0F };

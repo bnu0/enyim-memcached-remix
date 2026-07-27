@@ -28,7 +28,7 @@ This is a memcached client library for .NET migrated from [EnyimMemcached](https
       }
     ],
     "Authentication": {
-      "Type": "Enyim.Caching.Memcached.PlainTextAuthenticator",
+      "Type": "EnyimRedux.Caching.Memcached.PlainTextAuthenticator",
       "Parameters": {
         "zone": "",
         "userName": "username",

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached.LocatorFactories
+namespace EnyimRedux.Caching.Memcached.LocatorFactories
 {
     /// <summary>
     /// Create DefaultNodeLocator with any ServerAddressMutations

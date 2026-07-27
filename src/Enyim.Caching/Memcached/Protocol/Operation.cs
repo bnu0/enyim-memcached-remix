@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results;
 
-namespace Enyim.Caching.Memcached.Protocol
+namespace EnyimRedux.Caching.Memcached.Protocol
 {
     /// <summary>
     /// Base class for implementing operations.

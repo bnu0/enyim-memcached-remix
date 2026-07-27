@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     /// <summary>
     /// Interface for API methods that return detailed operation results

@@ -1,6 +1,6 @@
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// Provides an interface for serializing items for Memcached.

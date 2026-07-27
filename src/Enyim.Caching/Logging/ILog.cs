@@ -1,11 +1,11 @@
 ﻿using System;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
 	/// <summary>
 	/// The ILog interface is used by the client to log messages.
 	/// </summary>
-	/// <remarks>Use the <see cref="T:Enyim.Caching.LogManager" /> class to programmatically assign logger implementations.</remarks>
+	/// <remarks>Use the <see cref="T:EnyimRedux.Caching.LogManager" /> class to programmatically assign logger implementations.</remarks>
 	public interface ILog
 	{
 		bool IsDebugEnabled { get; }

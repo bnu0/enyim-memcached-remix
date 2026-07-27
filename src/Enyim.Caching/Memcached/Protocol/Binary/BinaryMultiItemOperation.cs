@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public abstract class BinaryMultiItemOperation : MultiItemOperation
     {

@@ -2,11 +2,11 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     internal static class GetHelper
     {
-        private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(GetHelper));
+        private static readonly EnyimRedux.Caching.ILog log = EnyimRedux.Caching.LogManager.GetLogger(typeof(GetHelper));
         private static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
         private static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
 

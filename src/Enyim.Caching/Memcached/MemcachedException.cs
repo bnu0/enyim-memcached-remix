@@ -1,6 +1,6 @@
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// The exception that is thrown when an unknown error occures in the <see cref="T:MemcachedClient"/>

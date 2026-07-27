@@ -1,5 +1,5 @@
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     public abstract class KeyTransformerBase : IMemcachedKeyTransformer
     {

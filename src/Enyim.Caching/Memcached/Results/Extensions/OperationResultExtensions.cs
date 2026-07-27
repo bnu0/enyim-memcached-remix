@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Results.Extensions
+namespace EnyimRedux.Caching.Memcached.Results.Extensions
 {
     public static class OperationResultExtensions
     {

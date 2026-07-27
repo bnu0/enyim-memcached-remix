@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Security;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Memcached;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     /// <summary>
     /// Defines an interface for configuring the <see cref="T:MemcachedClient"/>.
@@ -27,17 +27,17 @@ namespace Enyim.Caching.Configuration
         IAuthenticationConfiguration Authentication { get; }
 
         /// <summary>
-        /// Creates an <see cref="T:Enyim.Caching.Memcached.IMemcachedKeyTransformer"/> instance which will be used to convert item keys for Memcached.
+        /// Creates an <see cref="T:EnyimRedux.Caching.Memcached.IMemcachedKeyTransformer"/> instance which will be used to convert item keys for Memcached.
         /// </summary>
         IMemcachedKeyTransformer CreateKeyTransformer();
 
         /// <summary>
-        /// Creates an <see cref="T:Enyim.Caching.Memcached.IMemcachedNodeLocator"/> instance which will be used to assign items to Memcached nodes.
+        /// Creates an <see cref="T:EnyimRedux.Caching.Memcached.IMemcachedNodeLocator"/> instance which will be used to assign items to Memcached nodes.
         /// </summary>
         IMemcachedNodeLocator CreateNodeLocator();
 
         /// <summary>
-        /// Creates an <see cref="T:Enyim.Caching.Memcached.ITranscoder"/> instance which will be used to serialize or deserialize items.
+        /// Creates an <see cref="T:EnyimRedux.Caching.Memcached.ITranscoder"/> instance which will be used to serialize or deserialize items.
         /// </summary>
         ITranscoder CreateTranscoder();
 

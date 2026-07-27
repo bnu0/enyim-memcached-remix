@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>Enyim.Caching.SampleWebApp</RootNamespace>
+    <RootNamespace>EnyimRedux.Caching.SampleWebApp</RootNamespace>
     <AssemblyName>Enyim.Caching.SampleWebApp</AssemblyName>
   </PropertyGroup>
 

@@ -12,7 +12,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Transcoders
+namespace EnyimRedux.Caching.Memcached.Transcoders
 {
     public class MessagePackTranscoder : DefaultTranscoder
     {

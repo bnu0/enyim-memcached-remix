@@ -1,6 +1,6 @@
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// The exception that is thrown when a command is not supported by the Memcached server.

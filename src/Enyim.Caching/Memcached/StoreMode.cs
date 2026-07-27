@@ -1,5 +1,5 @@
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Inidicates the mode how the items are stored in Memcached.

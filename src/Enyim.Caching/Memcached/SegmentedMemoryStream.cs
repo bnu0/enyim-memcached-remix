@@ -3,7 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Enyim.Caching.Memcached;
+namespace EnyimRedux.Caching.Memcached;
 
 public class SegmentedMemoryStream : IDisposable
 {

@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public class StatsOperation : BinaryOperation, IStatsOperation
     {

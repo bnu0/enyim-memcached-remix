@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Enyim.Caching.SampleWebApp.Models;
+using EnyimRedux.Caching.SampleWebApp.Models;
 
-namespace Enyim.Caching.SampleWebApp.Services
+namespace EnyimRedux.Caching.SampleWebApp.Services
 {
     public class BlogPostService : IBlogPostService
     {

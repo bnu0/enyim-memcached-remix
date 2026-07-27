@@ -1,5 +1,5 @@
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// Represent a stat item returned by Memcached.

@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     public class GetOperation : SingleItemOperation, IGetOperation
     {

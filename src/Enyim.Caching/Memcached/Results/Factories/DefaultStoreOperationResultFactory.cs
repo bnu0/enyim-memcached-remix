@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Results.Factories
+namespace EnyimRedux.Caching.Memcached.Results.Factories
 {
 	public class DefaultStoreOperationResultFactory : IStoreOperationResultFactory
 	{

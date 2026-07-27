@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace Enyim.Collections
+namespace EnyimRedux.Collections
 {
     /// <summary>
     /// Implements a non-locking stack.

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Text;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Caching.Memcached.Results.Helpers;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results.Helpers;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public class GetOperation : BinarySingleItemOperation, IGetOperation
     {

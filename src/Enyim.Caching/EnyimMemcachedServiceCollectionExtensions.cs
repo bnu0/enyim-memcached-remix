@@ -1,6 +1,6 @@
-using Enyim.Caching;
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

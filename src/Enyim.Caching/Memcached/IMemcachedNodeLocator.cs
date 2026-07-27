@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// Defines a locator class which maps item keys to memcached servers.

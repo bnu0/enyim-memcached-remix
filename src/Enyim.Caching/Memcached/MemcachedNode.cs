@@ -1,8 +1,8 @@
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached.Protocol.Binary;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Collections;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached.Protocol.Binary;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Collections;
 
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +19,7 @@ using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Represents a Memcached node in the pool.

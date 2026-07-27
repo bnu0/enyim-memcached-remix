@@ -1,6 +1,6 @@
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	public class DefaultKeyTransformer : KeyTransformerBase
 	{

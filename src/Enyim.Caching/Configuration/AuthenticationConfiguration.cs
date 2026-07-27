@@ -1,8 +1,8 @@
-﻿using Enyim.Caching.Memcached;
+﻿using EnyimRedux.Caching.Memcached;
 using System;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Configuration
+namespace EnyimRedux.Caching.Configuration
 {
     public class AuthenticationConfiguration : IAuthenticationConfiguration
     {

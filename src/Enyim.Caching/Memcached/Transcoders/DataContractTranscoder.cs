@@ -5,10 +5,10 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Bson;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
-    /// Default <see cref="T:Enyim.Caching.Memcached.ITranscoder"/> implementation. Primitive types are manually serialized, the rest is serialized using <see cref="T:System.Runtime.Serialization.NetDataContractSerializer"/>.
+    /// Default <see cref="T:EnyimRedux.Caching.Memcached.ITranscoder"/> implementation. Primitive types are manually serialized, the rest is serialized using <see cref="T:System.Runtime.Serialization.NetDataContractSerializer"/>.
     /// </summary>
     public class DataContractTranscoder : DefaultTranscoder
     {

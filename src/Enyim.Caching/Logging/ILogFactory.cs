@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
 	/// <summary>
 	/// Implement this interface to instantiate your custom ILog implementation

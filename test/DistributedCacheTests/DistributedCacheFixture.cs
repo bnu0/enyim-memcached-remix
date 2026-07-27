@@ -1,4 +1,4 @@
-﻿using Enyim.Caching.TestCommon;
+﻿using EnyimRedux.Caching.TestCommon;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -1,8 +1,8 @@
-﻿using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Caching.Memcached.Results.Factories;
+﻿using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results.Factories;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     /// <summary>
     /// Memcached client.

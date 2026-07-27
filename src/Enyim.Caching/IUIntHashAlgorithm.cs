@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Enyim
+namespace EnyimRedux
 {
 	internal interface IUIntHashAlgorithm
 	{

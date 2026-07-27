@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Caching.Memcached.Results.Factories;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results.Factories;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public partial class MemcachedClient : IMemcachedClient, IMemcachedResultsClient
     {

@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Enyim.Caching.Configuration;
+using EnyimRedux.Caching.Configuration;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Fails a node when the specified number of failures happen in a specified time window.

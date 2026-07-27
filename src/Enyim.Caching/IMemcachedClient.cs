@@ -1,10 +1,10 @@
 ﻿using System;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Memcached;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public interface IMemcachedClient : IDisposable
     {

@@ -1,11 +1,11 @@
-﻿using Enyim.Caching.TestCommon;
+﻿using EnyimRedux.Caching.TestCommon;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Configuration;
-using Enyim.Caching;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching;
 using System.Threading;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;

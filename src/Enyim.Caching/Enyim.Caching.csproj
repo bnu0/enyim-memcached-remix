@@ -4,9 +4,10 @@
 		<Authors>cnblogs.com</Authors>
 		<TargetFrameworks>net48;net8.0</TargetFrameworks>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<AssemblyName>EnyimMemcachedRemix</AssemblyName>
+		<RootNamespace>EnyimRedux.Caching</RootNamespace>
+		<AssemblyName>EnyimMemcachedRemixRedux</AssemblyName>
 		<PackageVersion>420.0.9</PackageVersion>
-		<PackageId>EnyimMemcachedRemix</PackageId>
+		<PackageId>EnyimMemcachedRemixRedux</PackageId>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>memcached;cache</PackageTags>
 		<PackageProjectUrl>https://github.com/bnu0/enyim-memcached-remix</PackageProjectUrl>

@@ -1,14 +1,14 @@
 using System.Collections.Generic;
 using System.Text;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Extensions;
-using Enyim.Caching.Memcached.Results.Helpers;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Extensions;
+using EnyimRedux.Caching.Memcached.Results.Helpers;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     public class DeleteOperation : BinarySingleItemOperation, IDeleteOperation
     {
-        private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(DeleteOperation));
+        private static readonly EnyimRedux.Caching.ILog log = EnyimRedux.Caching.LogManager.GetLogger(typeof(DeleteOperation));
         public DeleteOperation(string key) : base(key) { }
 
         protected override BinaryRequest Build()

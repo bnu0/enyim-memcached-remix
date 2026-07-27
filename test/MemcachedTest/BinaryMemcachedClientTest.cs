@@ -1,5 +1,5 @@
-using Enyim.Caching;
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.Memcached;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xunit;
@@ -7,8 +7,8 @@ using Xunit;
 namespace MemcachedTest
 {
     /// <summary>
-    ///This is a test class for Enyim.Caching.MemcachedClient and is intended
-    ///to contain all Enyim.Caching.MemcachedClient Unit Tests
+    ///This is a test class for EnyimRedux.Caching.MemcachedClient and is intended
+    ///to contain all EnyimRedux.Caching.MemcachedClient Unit Tests
     ///</summary>
     public class BinaryMemcachedClientTest : MemcachedClientTest
     {

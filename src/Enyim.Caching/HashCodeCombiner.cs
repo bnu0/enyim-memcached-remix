@@ -1,5 +1,5 @@
 
-namespace Enyim
+namespace EnyimRedux
 {
     /// <summary>
     /// Combines multiple hash codes into one.

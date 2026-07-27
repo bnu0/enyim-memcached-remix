@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     public class StoreOperation : StoreOperationBase, IStoreOperation
     {

@@ -4,7 +4,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     public class CasOperation : StoreOperationBase, IStoreOperation
     {

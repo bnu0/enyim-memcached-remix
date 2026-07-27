@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Enyim.Caching;
-using Enyim.Caching.SampleWebApp.Models;
-using Enyim.Caching.SampleWebApp.Services;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.SampleWebApp.Models;
+using EnyimRedux.Caching.SampleWebApp.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching.SampleWebApp.Controllers
+namespace EnyimRedux.Caching.SampleWebApp.Controllers
 {
     public class HomeController : Controller
     {

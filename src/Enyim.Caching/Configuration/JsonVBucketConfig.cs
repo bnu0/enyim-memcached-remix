@@ -5,9 +5,9 @@
 //using System.Security.Cryptography;
 //using System.Net;
 //using System.Web.Script.Serialization;
-//using Enyim.Caching.Configuration;
+//using EnyimRedux.Caching.Configuration;
 
-//namespace Enyim.Caching.Configuration
+//namespace EnyimRedux.Caching.Configuration
 //{
 //    /// <summary>
 //    /// Parses a json formatted vbucket config.

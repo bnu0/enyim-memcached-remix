@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 
-namespace Enyim.Caching.Memcached.Protocol
+namespace EnyimRedux.Caching.Memcached.Protocol
 {
     /// <summary>
     /// Base class for implementing operations working with multiple items.

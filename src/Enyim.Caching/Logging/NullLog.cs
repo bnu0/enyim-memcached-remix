@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
 	/// <summary>
 	/// Creates an empty logger. Used when no other factories are installed.

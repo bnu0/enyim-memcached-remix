@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Memcached.Results;
-using Enyim.Caching.Memcached.Results.Factories;
+using EnyimRedux.Caching.Memcached;
+using EnyimRedux.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results.Factories;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public class NullMemcachedClient : IMemcachedClient
     {

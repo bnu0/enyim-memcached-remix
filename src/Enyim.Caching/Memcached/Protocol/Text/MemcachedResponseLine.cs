@@ -3,7 +3,7 @@ using System.Buffers;
 using System.Buffers.Text;
 using System.Text;
 
-namespace Enyim.Caching.Memcached.Protocol.Text
+namespace EnyimRedux.Caching.Memcached.Protocol.Text
 {
     internal readonly struct MemcachedResponseLine
     {

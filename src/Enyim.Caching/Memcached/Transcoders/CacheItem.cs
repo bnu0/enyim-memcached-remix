@@ -1,6 +1,6 @@
 using System;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Represents an object either being retrieved from the cache

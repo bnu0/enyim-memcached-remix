@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Enyim.Caching;
-using Enyim.Caching.SampleWebApp.Models;
-using Enyim.Caching.SampleWebApp.Services;
+using EnyimRedux.Caching;
+using EnyimRedux.Caching.SampleWebApp.Models;
+using EnyimRedux.Caching.SampleWebApp.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Enyim.Caching.SampleWebApp
+namespace EnyimRedux.Caching.SampleWebApp
 {
     public class Startup
     {

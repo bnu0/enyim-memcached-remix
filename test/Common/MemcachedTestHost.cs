@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 
-namespace Enyim.Caching.TestCommon
+namespace EnyimRedux.Caching.TestCommon
 {
     public static class MemcachedTestHost
     {

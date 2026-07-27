@@ -1,5 +1,5 @@
-﻿using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
+﻿using EnyimRedux.Caching.Configuration;
+using EnyimRedux.Caching.Memcached;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,12 +7,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class MemcachedClientWithKeyTransformerTests : MemcachedClientTestsBase
     {
         public MemcachedClientWithKeyTransformerTests()
-            : base(options => options.KeyTransformer = "Enyim.Caching.Memcached.TigerHashKeyTransformer")
+            : base(options => options.KeyTransformer = "EnyimRedux.Caching.Memcached.TigerHashKeyTransformer")
         {
         }
 

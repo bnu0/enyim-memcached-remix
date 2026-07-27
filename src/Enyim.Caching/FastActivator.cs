@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Linq.Expressions;
 
-namespace Enyim.Reflection
+namespace EnyimRedux.Reflection
 {
     /// <summary>
     /// <para>Implements a very fast object factory for dynamic object creation. Dynamically generates a factory class which will use the new() constructor of the requested type.</para>

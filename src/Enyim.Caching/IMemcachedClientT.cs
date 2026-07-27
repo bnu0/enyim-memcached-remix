@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Enyim.Caching
+namespace EnyimRedux.Caching
 {
     public interface IMemcachedClient<T> : IMemcachedClient
     {

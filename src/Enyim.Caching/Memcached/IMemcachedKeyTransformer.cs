@@ -1,5 +1,5 @@
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
 	/// <summary>
 	/// Converts Memcached item keys into a custom format.

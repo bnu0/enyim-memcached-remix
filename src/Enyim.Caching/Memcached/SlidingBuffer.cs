@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using Enyim.Collections;
+using EnyimRedux.Collections;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     /// <summary>
     /// Supports exactly one reader and writer, but they can access the buffer concurrently.

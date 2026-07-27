@@ -10,7 +10,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Enyim.Caching.Memcached
+namespace EnyimRedux.Caching.Memcached
 {
     [DebuggerDisplay("[ Address: {endpoint}, IsAlive = {IsAlive} ]")]
     public partial class PooledSocket : IDisposable

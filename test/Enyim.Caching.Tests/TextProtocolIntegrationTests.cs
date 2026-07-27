@@ -1,11 +1,11 @@
-using Enyim.Caching.Memcached;
+using EnyimRedux.Caching.Memcached;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Enyim.Caching.Tests
+namespace EnyimRedux.Caching.Tests
 {
     public class TextProtocolIntegrationTests : MemcachedClientTestsBase
     {

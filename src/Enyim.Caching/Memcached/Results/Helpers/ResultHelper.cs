@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Enyim.Caching.Memcached.Results.Factories;
+using EnyimRedux.Caching.Memcached.Results.Factories;
 
-namespace Enyim.Caching.Memcached.Results.Helpers
+namespace EnyimRedux.Caching.Memcached.Results.Helpers
 {
 
     public static class ResultHelper

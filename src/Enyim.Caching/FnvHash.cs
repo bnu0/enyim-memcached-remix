@@ -1,7 +1,7 @@
 using System;
 using System.Security.Cryptography;
 
-namespace Enyim
+namespace EnyimRedux
 {
     /// <summary>
     /// Implements a 64 bit long FNV1 hash.

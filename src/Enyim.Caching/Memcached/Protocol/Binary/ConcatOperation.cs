@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Enyim.Caching.Memcached.Results;
+using EnyimRedux.Caching.Memcached.Results;
 
-namespace Enyim.Caching.Memcached.Protocol.Binary
+namespace EnyimRedux.Caching.Memcached.Protocol.Binary
 {
     /// <summary>
     /// Implements append/prepend.
