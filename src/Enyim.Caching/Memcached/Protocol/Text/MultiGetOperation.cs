@@ -42,7 +42,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             catch (Exception e)
             {
                 _log.Error(e);
-                return new TextOperationResult().Fail("Failed to read multi-get response.", e);
+                return new TextOperationResult().Fail(e.Message ?? "Failed to read multi-get response.", e);
             }
 
             return new TextOperationResult().Pass();
@@ -69,7 +69,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             catch (Exception e)
             {
                 _log.Error(e);
-                return new ValueTask<IOperationResult>(new TextOperationResult().Fail("Failed to read multi-get response.", e));
+                return new ValueTask<IOperationResult>(
+                    new TextOperationResult().Fail(e.Message ?? "Failed to read multi-get response.", e));
             }
 
             return new ValueTask<IOperationResult>(new TextOperationResult().Pass());

@@ -44,7 +44,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         {
             if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
             {
-                throw new MemcachedClientException("Unexpected end of stream while reading memcached response.");
+                // Match remix ReadResponse: EOF is "Empty response received."
+                throw new MemcachedClientException("Empty response received.");
             }
 
             try
@@ -56,7 +57,9 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
                 if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
                 {
-                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n{MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length))}");
+                    throw new MemcachedClientException(
+                        "No VALUE response received.\r\n" +
+                        MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
                 }
 
                 ulong casValue = 0;
@@ -103,7 +106,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         {
             if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
             {
-                return null;
+                throw new MemcachedClientException("Empty response received.");
             }
 
             try
@@ -115,7 +118,9 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
                 if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
                 {
-                    throw new MemcachedClientException($"No VALUE response received ({line.PartCount} parts).\r\n{MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length))}");
+                    throw new MemcachedClientException(
+                        "No VALUE response received.\r\n" +
+                        MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
                 }
 
                 ulong casValue = 0;
