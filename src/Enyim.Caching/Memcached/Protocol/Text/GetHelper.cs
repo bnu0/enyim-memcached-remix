@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
@@ -7,8 +6,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
     internal static class GetHelper
     {
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(GetHelper));
-        private static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
-        private static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
+        internal static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
+        internal static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
 
         internal enum ReadItemStatus
         {
@@ -42,124 +41,53 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             IDictionary<string, CacheItem> items,
             IDictionary<string, ulong> cas)
         {
-            if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
+            if (!TextSocketHelper.TryReadGetHeader(socket, out MemcachedGetHeader header))
             {
-                // Match remix ReadResponse: EOF is "Empty response received."
                 throw new MemcachedClientException("Empty response received.");
             }
 
-            try
+            if (header.IsEnd)
             {
-                if (line.PartCount == 1 && line.GetPart(0).SequenceEqual(EndToken))
-                {
-                    return ReadItemStatus.End;
-                }
-
-                if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
-                {
-                    throw new MemcachedClientException(
-                        "No VALUE response received.\r\n" +
-                        MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
-                }
-
-                ulong casValue = 0;
-                if (line.PartCount == 5)
-                {
-                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out casValue))
-                    {
-                        throw new MemcachedClientException("Invalid CAS VALUE received.");
-                    }
-                }
-
-                if (!MemcachedResponseLine.TryParseUInt16(line.GetPart(2), out ushort flags))
-                {
-                    throw new MemcachedClientException("Invalid flags VALUE received.");
-                }
-
-                if (!MemcachedResponseLine.TryParseInt32(line.GetPart(3), out int length))
-                {
-                    throw new MemcachedClientException("Invalid length VALUE received.");
-                }
-
-                string key = MemcachedResponseLine.GetAsciiString(line.GetPart(1));
-                byte[] allData = new byte[length];
-
-                ReadPayloadAndEndMarker(socket, allData, length);
-
-                items[key] = new CacheItem(flags, new ArraySegment<byte>(allData, 0, length));
-                cas[key] = casValue;
-
-                if (log.IsDebugEnabled)
-                {
-                    log.DebugFormat("Received value. Data type: {0}, size: {1}.", flags, length);
-                }
-
-                return ReadItemStatus.ItemRead;
+                return ReadItemStatus.End;
             }
-            finally
+
+            byte[] allData = new byte[header.Length];
+            ReadPayloadAndEndMarker(socket, allData, header.Length);
+
+            items[header.Key] = new CacheItem(header.Flags, new ArraySegment<byte>(allData, 0, header.Length));
+            cas[header.Key] = header.Cas;
+
+            if (log.IsDebugEnabled)
             {
-                ArrayPool<byte>.Shared.Return(line.Buffer);
+                log.DebugFormat("Received value. Data type: {0}, size: {1}.", header.Flags, header.Length);
             }
+
+            return ReadItemStatus.ItemRead;
         }
 
         public static GetResponse ReadItem(PooledSocket socket)
         {
-            if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
+            if (!TextSocketHelper.TryReadGetHeader(socket, out MemcachedGetHeader header))
             {
                 throw new MemcachedClientException("Empty response received.");
             }
 
-            try
+            if (header.IsEnd)
             {
-                if (line.PartCount == 1 && line.GetPart(0).SequenceEqual(EndToken))
-                {
-                    return null;
-                }
-
-                if (line.PartCount < 4 || !line.GetPart(0).SequenceEqual(ValueToken))
-                {
-                    throw new MemcachedClientException(
-                        "No VALUE response received.\r\n" +
-                        MemcachedResponseLine.GetAsciiString(line.Buffer.AsSpan(0, line.Length)));
-                }
-
-                ulong casValue = 0;
-                if (line.PartCount == 5)
-                {
-                    if (!MemcachedResponseLine.TryParseUInt64(line.GetPart(4), out casValue))
-                    {
-                        throw new MemcachedClientException("Invalid CAS VALUE received.");
-                    }
-                }
-
-                if (!MemcachedResponseLine.TryParseUInt16(line.GetPart(2), out ushort flags))
-                {
-                    throw new MemcachedClientException("Invalid flags VALUE received.");
-                }
-
-                if (!MemcachedResponseLine.TryParseInt32(line.GetPart(3), out int length))
-                {
-                    throw new MemcachedClientException("Invalid length VALUE received.");
-                }
-
-                string key = MemcachedResponseLine.GetAsciiString(line.GetPart(1));
-                byte[] allData = new byte[length];
-
-                ReadPayloadAndEndMarker(socket, allData, length);
-
-                GetResponse retval = new GetResponse(key, flags, casValue, allData);
-
-                if (log.IsDebugEnabled)
-                {
-                    log.DebugFormat("Received value. Data type: {0}, size: {1}.", retval.Item.Flags, retval.Item.Data.Count);
-                }
-
-                return retval;
+                return null;
             }
-            finally
+
+            byte[] allData = new byte[header.Length];
+            ReadPayloadAndEndMarker(socket, allData, header.Length);
+
+            GetResponse retval = new GetResponse(header.Key, header.Flags, header.Cas, allData);
+
+            if (log.IsDebugEnabled)
             {
-                ArrayPool<byte>.Shared.Return(line.Buffer);
+                log.DebugFormat("Received value. Data type: {0}, size: {1}.", retval.Item.Flags, retval.Item.Data.Count);
             }
+
+            return retval;
         }
 
         private static void ReadPayloadAndEndMarker(PooledSocket socket, byte[] payload, int length)

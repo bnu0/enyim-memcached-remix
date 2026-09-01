@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Buffers;
-using System.IO;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.ObjectPool;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
@@ -17,25 +15,12 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         private const string ServerErrorResponse = "SERVER_ERROR ";
         private static byte[] ServerErrorResponseBytes = Encoding.ASCII.GetBytes(ServerErrorResponse);
         private const int ErrorResponseLength = 13;
+        internal const int TypicalResponseLineSize = 512;
+        private const int MaxResponseLineLength = 64 * 1024;
 
         public const string CommandTerminator = "\r\n";
 
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(TextSocketHelper));
-
-        private static readonly ObjectPool<SegmentedMemoryStream> SegmentedMemoryStreamPool =
-            new DefaultObjectPoolProvider { MaximumRetained = 64 }
-                .Create(new SegmentedMemoryStreamPoolPolicy());
-
-        private sealed class SegmentedMemoryStreamPoolPolicy : IPooledObjectPolicy<SegmentedMemoryStream>
-        {
-            public SegmentedMemoryStream Create() => new SegmentedMemoryStream(1024);
-
-            public bool Return(SegmentedMemoryStream obj)
-            {
-                obj.Reset();
-                return true;
-            }
-        }
 
         /// <summary>
         /// Reads the response of the server.
@@ -109,28 +94,160 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         internal static bool TryReadResponseLine(PooledSocket socket, out MemcachedResponseLine line)
         {
             line = default;
-            var ms = ReadSocketContet(socket);
-            if (ms == null)
+            Span<byte> stack = stackalloc byte[TypicalResponseLineSize];
+            byte[] rented = null;
+            if (!TryReadLine(socket, stack, ref rented, out int length))
             {
                 return false;
             }
 
-            var buff = ArrayPool<byte>.Shared.Rent(ms.Length);
+            byte[] buffer = rented;
+            if (buffer == null)
+            {
+                buffer = ArrayPool<byte>.Shared.Rent(length);
+                stack.Slice(0, length).CopyTo(buffer);
+            }
+
             try
             {
-                ms.ToArray(buff);
-                if (!TryParseResponseLine(buff, ms.Length, out line))
+                if (!TryParseResponseLine(buffer, length, out line))
                 {
-                    ArrayPool<byte>.Shared.Return(buff);
+                    ArrayPool<byte>.Shared.Return(buffer);
                     return false;
                 }
 
+                rented = null;
+                return true;
+            }
+            catch
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+                rented = null;
+                throw;
+            }
+        }
+
+        internal static bool TryReadGetHeader(PooledSocket socket, out MemcachedGetHeader header)
+        {
+            header = default;
+            Span<byte> stack = stackalloc byte[TypicalResponseLineSize];
+            byte[] rented = null;
+            try
+            {
+                if (!TryReadLine(socket, stack, ref rented, out int length))
+                {
+                    return false;
+                }
+
+                ReadOnlySpan<byte> line = rented != null
+                    ? rented.AsSpan(0, length)
+                    : stack.Slice(0, length);
+                header = ParseGetHeader(line);
                 return true;
             }
             finally
             {
-                SegmentedMemoryStreamPool.Return(ms);
+                if (rented != null)
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                }
             }
+        }
+
+        private static bool TryReadLine(PooledSocket socket, Span<byte> stack, ref byte[] rented, out int length)
+        {
+            rented = null;
+            if (!socket.TryReadCrlfLine(stack, out length, out bool truncated))
+            {
+                log.Warn("Socket EOF/half-open, killing socket");
+                return false;
+            }
+
+            if (!truncated)
+            {
+                return true;
+            }
+
+            rented = ArrayPool<byte>.Shared.Rent(Math.Max(TypicalResponseLineSize * 2, length * 2));
+            stack.Slice(0, length).CopyTo(rented);
+            int written = length;
+            while (true)
+            {
+                if (written >= MaxResponseLineLength)
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                    rented = null;
+                    throw new MemcachedClientException("Memcached response line exceeded " + MaxResponseLineLength + " bytes.");
+                }
+
+                if (written == rented.Length)
+                {
+                    var bigger = ArrayPool<byte>.Shared.Rent(rented.Length * 2);
+                    Buffer.BlockCopy(rented, 0, bigger, 0, written);
+                    ArrayPool<byte>.Shared.Return(rented);
+                    rented = bigger;
+                }
+
+                if (!socket.TryReadCrlfLine(rented.AsSpan(written), out int n, out truncated))
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                    rented = null;
+                    log.Warn("Socket EOF/half-open, killing socket");
+                    return false;
+                }
+
+                written += n;
+                if (!truncated)
+                {
+                    length = written;
+                    return true;
+                }
+            }
+        }
+
+        private static MemcachedGetHeader ParseGetHeader(ReadOnlySpan<byte> line)
+        {
+            SplitParts(
+                line,
+                out int partCount,
+                out int part0Start, out int part0Length,
+                out int part1Start, out int part1Length,
+                out int part2Start, out int part2Length,
+                out int part3Start, out int part3Length,
+                out int part4Start, out int part4Length);
+
+            if (partCount == 1 && line.Slice(part0Start, part0Length).SequenceEqual(GetHelper.EndToken))
+            {
+                return MemcachedGetHeader.End;
+            }
+
+            if (partCount < 4 || !line.Slice(part0Start, part0Length).SequenceEqual(GetHelper.ValueToken))
+            {
+                throw new MemcachedClientException(
+                    "No VALUE response received.\r\n" + MemcachedResponseLine.GetAsciiString(line));
+            }
+
+            ulong casValue = 0;
+            if (partCount == 5)
+            {
+                if (!MemcachedResponseLine.TryParseUInt64(line.Slice(part4Start, part4Length), out casValue))
+                {
+                    throw new MemcachedClientException("Invalid CAS VALUE received.");
+                }
+            }
+
+            if (!MemcachedResponseLine.TryParseUInt16(line.Slice(part2Start, part2Length), out ushort flags))
+            {
+                throw new MemcachedClientException("Invalid flags VALUE received.");
+            }
+
+            if (!MemcachedResponseLine.TryParseInt32(line.Slice(part3Start, part3Length), out int payloadLength))
+            {
+                throw new MemcachedClientException("Invalid length VALUE received.");
+            }
+
+            string key = MemcachedResponseLine.GetAsciiString(line.Slice(part1Start, part1Length));
+            return new MemcachedGetHeader(key, flags, payloadLength, casValue);
         }
 
         private static void ValidateResponseLine(in MemcachedResponseLine line)
@@ -165,39 +282,14 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         private static bool TryParseResponseLine(byte[] buffer, int length, out MemcachedResponseLine line)
         {
-            int partCount = 0;
-            int part0Start = 0, part0Length = 0;
-            int part1Start = 0, part1Length = 0;
-            int part2Start = 0, part2Length = 0;
-            int part3Start = 0, part3Length = 0;
-            int part4Start = 0, part4Length = 0;
-            int lastIndex = 0;
-
-            for (int i = 0; i < length; i++)
-            {
-                if (partCount >= 5)
-                {
-                    throw new MemcachedException("Found too many parts\r\n" + Encoding.ASCII.GetString(buffer, 0, length));
-                }
-
-                if (buffer[i] == 0x20)
-                {
-                    AssignPart(partCount, lastIndex, i - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
-                    partCount++;
-                    lastIndex = i + 1;
-                }
-            }
-
-            if (lastIndex < length)
-            {
-                if (partCount >= 5)
-                {
-                    throw new MemcachedException("Found too many parts\r\n" + Encoding.ASCII.GetString(buffer, 0, length));
-                }
-
-                AssignPart(partCount, lastIndex, length - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
-                partCount++;
-            }
+            SplitParts(
+                buffer.AsSpan(0, length),
+                out int partCount,
+                out int part0Start, out int part0Length,
+                out int part1Start, out int part1Length,
+                out int part2Start, out int part2Length,
+                out int part3Start, out int part3Length,
+                out int part4Start, out int part4Length);
 
             line = new MemcachedResponseLine(
                 buffer,
@@ -214,6 +306,50 @@ namespace Enyim.Caching.Memcached.Protocol.Text
                 part4Start,
                 part4Length);
             return true;
+        }
+
+        private static void SplitParts(
+            ReadOnlySpan<byte> line,
+            out int partCount,
+            out int part0Start, out int part0Length,
+            out int part1Start, out int part1Length,
+            out int part2Start, out int part2Length,
+            out int part3Start, out int part3Length,
+            out int part4Start, out int part4Length)
+        {
+            partCount = 0;
+            part0Start = 0; part0Length = 0;
+            part1Start = 0; part1Length = 0;
+            part2Start = 0; part2Length = 0;
+            part3Start = 0; part3Length = 0;
+            part4Start = 0; part4Length = 0;
+            int lastIndex = 0;
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                if (partCount >= 5)
+                {
+                    throw new MemcachedException("Found too many parts\r\n" + MemcachedResponseLine.GetAsciiString(line));
+                }
+
+                if (line[i] == 0x20)
+                {
+                    AssignPart(partCount, lastIndex, i - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
+                    partCount++;
+                    lastIndex = i + 1;
+                }
+            }
+
+            if (lastIndex < line.Length)
+            {
+                if (partCount >= 5)
+                {
+                    throw new MemcachedException("Found too many parts\r\n" + MemcachedResponseLine.GetAsciiString(line));
+                }
+
+                AssignPart(partCount, lastIndex, line.Length - lastIndex, ref part0Start, ref part0Length, ref part1Start, ref part1Length, ref part2Start, ref part2Length, ref part3Start, ref part3Length, ref part4Start, ref part4Length);
+                partCount++;
+            }
         }
 
         private static void AssignPart(
@@ -262,15 +398,19 @@ namespace Enyim.Caching.Memcached.Protocol.Text
         /// <returns></returns>
         private static string ReadLine(PooledSocket socket)
         {
-            var ms = ReadSocketContet(socket);
-            if (ms == null)
-            {
-                return string.Empty;
-            }
-
+            Span<byte> stack = stackalloc byte[TypicalResponseLineSize];
+            byte[] rented = null;
             try
             {
-                string retval = ms.ConvertToAscii();
+                if (!TryReadLine(socket, stack, ref rented, out int length))
+                {
+                    return string.Empty;
+                }
+
+                ReadOnlySpan<byte> line = rented != null
+                    ? rented.AsSpan(0, length)
+                    : stack.Slice(0, length);
+                string retval = MemcachedResponseLine.GetAsciiString(line);
                 if (log.IsDebugEnabled)
                 {
                     log.Debug("ReadLine: " + retval);
@@ -280,50 +420,11 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
             finally
             {
-                SegmentedMemoryStreamPool.Return(ms);
+                if (rented != null)
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                }
             }
-        }
-
-        private static SegmentedMemoryStream ReadSocketContet(PooledSocket socket)
-        {
-            var ms = SegmentedMemoryStreamPool.Get();
-
-            bool gotR = false;
-
-            int data;
-
-            while (true)
-            {
-                data = socket.ReadByte();
-
-                if (data == -1) // EOF / half-open → kill this socket
-                {
-                    log.Warn("Socket EOF/half-open, killing socket");
-                    socket.IsAlive = false;
-                    SegmentedMemoryStreamPool.Return(ms);
-                    return null;
-                }
-
-                if (data == 13)
-                {
-                    gotR = true;
-                    continue;
-                }
-
-                if (gotR)
-                {
-                    if (data == 10)
-                        break;
-
-                    ms.WriteByte(13);
-
-                    gotR = false;
-                }
-
-                ms.WriteByte((byte) data);
-            }
-
-            return ms;
         }
 
 #if NET8_0_OR_GREATER
