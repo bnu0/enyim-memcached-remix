@@ -7,7 +7,6 @@ using Enyim.Collections;
 using Microsoft.Extensions.Logging;
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -279,11 +278,6 @@ namespace Enyim.Caching.Memcached
             private readonly ILogger _logger;
             private readonly bool _isDebugEnabled;
 
-            /// <summary>
-            /// A list of already connected but free to use sockets
-            /// </summary>
-            private ConcurrentStack<PooledSocket> _freeItems;
-
             private bool _isDisposed;
             private bool _isAlive;
             private DateTime _markedAsDeadUtc;
@@ -295,8 +289,7 @@ namespace Enyim.Caching.Memcached
             private readonly EndPoint _endPoint;
             private readonly TimeSpan _queueTimeout;
             private readonly TimeSpan _receiveTimeout;
-            private readonly TimeSpan _connectionIdleTimeout;
-            private SemaphoreSlim _semaphore;
+            private StripedSocketPool _sockets;
 
             private readonly object initLock = new Object();
 
@@ -321,13 +314,11 @@ namespace Enyim.Caching.Memcached
                 _endPoint = ownerNode.EndPoint;
                 _queueTimeout = config.QueueTimeout;
                 _receiveTimeout = config.ReceiveTimeout;
-                _connectionIdleTimeout = config.ConnectionIdleTimeout;
 
                 _minItems = config.MinPoolSize;
                 _maxItems = config.MaxPoolSize;
 
-                _semaphore = new SemaphoreSlim(_maxItems, _maxItems);
-                _freeItems = new ConcurrentStack<PooledSocket>();
+                _sockets = new StripedSocketPool(_maxItems, config.ConnectionIdleTimeout, logger);
 
                 _logger = logger;
                 _isDebugEnabled = _logger.IsEnabled(LogLevel.Debug);
@@ -343,7 +334,18 @@ namespace Enyim.Caching.Memcached
                         {
                             try
                             {
-                                _freeItems.Push(CreateSocket());
+                                if (_sockets.TryReserveSlot())
+                                {
+                                    try
+                                    {
+                                        _sockets.Enqueue(CreateSocket());
+                                    }
+                                    catch
+                                    {
+                                        _sockets.ReleaseReservedSlot();
+                                        throw;
+                                    }
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -378,7 +380,18 @@ namespace Enyim.Caching.Memcached
                         {
                             try
                             {
-                                _freeItems.Push(await CreateSocketAsync());
+                                if (_sockets.TryReserveSlot())
+                                {
+                                    try
+                                    {
+                                        _sockets.Enqueue(await CreateSocketAsync());
+                                    }
+                                    catch
+                                    {
+                                        _sockets.ReleaseReservedSlot();
+                                        throw;
+                                    }
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -438,80 +451,143 @@ namespace Enyim.Caching.Memcached
                 var result = new PooledSocketResult();
                 if (_isDebugEnabled) _logger.LogDebug($"Acquiring stream from pool on node '{_endPoint}'");
 
-                string message;
                 if (!_isAlive || _isDisposed)
                 {
-                    message = "Pool is dead or disposed, returning null. " + _endPoint;
-                    result.Fail(message);
+                    return FailDeadOrDisposed(result);
+                }
 
-                    if (_isDebugEnabled) _logger.LogDebug(message);
+                if (_sockets.TryTake(out var socket))
+                {
+                    return CompleteAcquireFromPool(result, socket);
+                }
 
+                if (TryCreateSocket(result, out socket))
+                {
                     return result;
                 }
 
-                if (!_semaphore.Wait(_queueTimeout))
-                {
-                    message = "Pool is full, timeouting. " + _endPoint;
-                    if (_isDebugEnabled) _logger.LogDebug(message);
-                    result.Fail(message, new TimeoutException());
+                return WaitForSocket(result);
+            }
 
-                    // everyone is so busy
+            /// <summary>
+            /// Acquires a new item from the pool
+            /// </summary>
+            /// <returns>An <see cref="T:PooledSocket"/> instance which is connected to the memcached server, or <value>null</value> if the pool is dead.</returns>
+            public async Task<IPooledSocketResult> AcquireAsync()
+            {
+                var result = new PooledSocketResult();
+
+                if (_isDebugEnabled) _logger.LogDebug("Acquiring stream from pool. " + _endPoint);
+
+                if (!_isAlive || _isDisposed)
+                {
+                    return FailDeadOrDisposed(result);
+                }
+
+                if (_sockets.TryTake(out var socket))
+                {
+                    return await CompleteAcquireFromPoolAsync(result, socket).ConfigureAwait(false);
+                }
+
+                if (await TryCreateSocketAsync(result).ConfigureAwait(false))
+                {
                     return result;
                 }
 
-                // maybe we died while waiting
-                if (!_isAlive)
+                return await WaitForSocketAsync(result).ConfigureAwait(false);
+            }
+
+            private IPooledSocketResult FailDeadOrDisposed(PooledSocketResult result)
+            {
+                var message = "Pool is dead or disposed, returning null. " + _endPoint;
+                result.Fail(message);
+
+                if (_isDebugEnabled) _logger.LogDebug(message);
+
+                return result;
+            }
+
+            private IPooledSocketResult CompleteAcquireFromPool(PooledSocketResult result, PooledSocket socket)
+            {
+                try
                 {
-                    _semaphore.Release();
+                    socket.Reset();
 
-                    message = "Pool is dead, returning null. " + _endPoint;
+                    var message = "Socket was reset. " + socket.InstanceId;
                     if (_isDebugEnabled) _logger.LogDebug(message);
-                    result.Fail(message);
 
+                    result.Pass(message);
+                    socket.UpdateLastUsed();
+                    result.Value = socket;
                     return result;
                 }
-
-
-                PooledSocket socket;
-                // do we have free items?
-                if (TryPopPooledSocket(out socket))
+                catch (Exception e)
                 {
-                    #region [ get it from the pool         ]
+                    var message = "Failed to reset an acquired socket.";
+                    _logger.LogError(message, e);
 
-                    try
+                    DiscardCheckedOutSocket(socket);
+                    MarkAsDead();
+
+                    result.Fail(message, e);
+                    return result;
+                }
+            }
+
+            private async Task<IPooledSocketResult> CompleteAcquireFromPoolAsync(PooledSocketResult result, PooledSocket socket)
+            {
+                try
+                {
+                    var resetTask = socket.ResetAsync();
+
+                    if (await Task.WhenAny(resetTask, Task.Delay(_receiveTimeout)).ConfigureAwait(false) == resetTask)
                     {
-                        socket.Reset();
+                        await resetTask.ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        socket.IsAlive = false;
+                        DiscardCheckedOutSocket(socket);
 
-                        message = "Socket was reset. " + socket.InstanceId;
-                        if (_isDebugEnabled) _logger.LogDebug(message);
-
-                        result.Pass(message);
-                        socket.UpdateLastUsed();
-                        result.Value = socket;
+                        var timeoutMessage = "Timeout to reset an acquired socket. InstanceId " + socket.InstanceId;
+                        _logger.LogError(timeoutMessage);
+                        result.Fail(timeoutMessage);
                         return result;
                     }
-                    catch (Exception e)
-                    {
-                        message = "Failed to reset an acquired socket.";
-                        _logger.LogError(message, e);
 
-                        MarkAsDead();
-                        _semaphore.Release();
+                    var message = "Socket was reset. InstanceId " + socket.InstanceId;
+                    if (_isDebugEnabled) _logger.LogDebug(message);
 
-                        result.Fail(message, e);
-                        return result;
-                    }
+                    result.Pass(message);
+                    socket.UpdateLastUsed();
+                    result.Value = socket;
+                    return result;
+                }
+                catch (Exception e)
+                {
+                    DiscardCheckedOutSocket(socket);
+                    MarkAsDead();
 
-                    #endregion
+                    var message = "Failed to reset an acquired socket.";
+                    _logger.LogError(message, e);
+                    result.Fail(message, e);
+                    return result;
+                }
+            }
+
+            private bool TryCreateSocket(PooledSocketResult result, out PooledSocket socket)
+            {
+                socket = null;
+                if (!_sockets.TryReserveSlot())
+                {
+                    return false;
                 }
 
-                // free item pool is empty
-                message = "Could not get a socket from the pool, Creating a new item. " + _endPoint;
+                var message = "Could not get a socket from the pool, Creating a new item. " + _endPoint;
                 if (_isDebugEnabled) _logger.LogDebug(message);
 
                 try
                 {
-                    // okay, create the new item
                     var startTime = DateTime.Now;
                     socket = CreateSocket();
 
@@ -522,156 +598,149 @@ namespace Enyim.Caching.Memcached
 
                     result.Value = socket;
                     result.Pass();
+                    return true;
                 }
                 catch (Exception e)
                 {
+                    _sockets.ReleaseReservedSlot();
+
                     message = "Failed to create socket. " + _endPoint;
                     _logger.LogError(message, e);
 
-                    // eventhough this item failed the failure policy may keep the pool alive
-                    // so we need to make sure to release the semaphore, so new connections can be
-                    // acquired or created (otherwise dead conenctions would "fill up" the pool
-                    // while the FP pretends that the pool is healthy)
-                    _semaphore.Release();
-
                     MarkAsDead();
                     result.Fail(message, e);
-                    return result;
+                    socket = null;
+                    return true;
                 }
-
-                if (_isDebugEnabled) _logger.LogDebug("Done.");
-
-                return result;
             }
 
-            /// <summary>
-            /// Acquires a new item from the pool
-            /// </summary>
-            /// <returns>An <see cref="T:PooledSocket"/> instance which is connected to the memcached server, or <value>null</value> if the pool is dead.</returns>
-            public async Task<IPooledSocketResult> AcquireAsync()
+            private async Task<bool> TryCreateSocketAsync(PooledSocketResult result)
             {
-                var result = new PooledSocketResult();
-                var message = string.Empty;
-
-                if (_isDebugEnabled) _logger.LogDebug("Acquiring stream from pool. " + _endPoint);
-
-                if (!_isAlive || _isDisposed)
+                if (!_sockets.TryReserveSlot())
                 {
-                    message = "Pool is dead or disposed, returning null. " + _endPoint;
-                    result.Fail(message);
-
-                    if (_isDebugEnabled) _logger.LogDebug(message);
-
-                    return result;
+                    return false;
                 }
 
-                PooledSocket socket = null;
-
-                if (!await _semaphore.WaitAsync(_queueTimeout))
-                {
-                    message = "Pool is full, timeouting. " + _endPoint;
-                    if (_isDebugEnabled) _logger.LogDebug(message);
-                    result.Fail(message, new TimeoutException());
-
-                    // everyone is so busy
-                    return result;
-                }
-
-                // maybe we died while waiting
-                if (!_isAlive)
-                {
-                    _semaphore.Release();
-
-                    message = "Pool is dead, returning null. " + _endPoint;
-                    if (_isDebugEnabled) _logger.LogDebug(message);
-                    result.Fail(message);
-                    return result;
-                }
-
-                // do we have free items?
-                if (TryPopPooledSocket(out socket))
-                {
-                    #region [ get it from the pool         ]
-
-                    try
-                    {
-                        var resetTask = socket.ResetAsync();
-
-                        if (await Task.WhenAny(resetTask, Task.Delay(_receiveTimeout)) == resetTask)
-                        {
-                            await resetTask;
-                        }
-                        else
-                        {
-                            _semaphore.Release();
-                            socket.IsAlive = false;
-
-                            message = "Timeout to reset an acquired socket. InstanceId " + socket.InstanceId;
-                            _logger.LogError(message);
-                            result.Fail(message);
-                            return result;
-                        }
-
-                        message = "Socket was reset. InstanceId " + socket.InstanceId;
-                        if (_isDebugEnabled) _logger.LogDebug(message);
-
-                        result.Pass(message);
-                        socket.UpdateLastUsed();
-                        result.Value = socket;
-                        return result;
-                    }
-                    catch (Exception e)
-                    {
-                        MarkAsDead();
-                        _semaphore.Release();
-
-                        message = "Failed to reset an acquired socket.";
-                        _logger.LogError(message, e);
-                        result.Fail(message, e);
-                        return result;
-                    }
-
-                    #endregion
-                }
-
-                // free item pool is empty
-                message = "Could not get a socket from the pool, Creating a new item. " + _endPoint;
+                var message = "Could not get a socket from the pool, Creating a new item. " + _endPoint;
                 if (_isDebugEnabled) _logger.LogDebug(message);
-
 
                 try
                 {
-                    // okay, create the new item
                     var startTime = DateTime.Now;
-                    socket = await CreateSocketAsync();
+                    var created = await CreateSocketAsync().ConfigureAwait(false);
 
                     if (_logger.IsEnabled(LogLevel.Information))
                     {
                         _logger.LogInformation("MemcachedAcquire-CreateSocket: {0}ms", (DateTime.Now - startTime).TotalMilliseconds);
                     }
 
-                    result.Value = socket;
+                    result.Value = created;
                     result.Pass();
+                    return true;
                 }
                 catch (Exception e)
                 {
+                    _sockets.ReleaseReservedSlot();
+
                     message = "Failed to create socket. " + _endPoint;
                     _logger.LogError(message, e);
 
-                    // eventhough this item failed the failure policy may keep the pool alive
-                    // so we need to make sure to release the semaphore, so new connections can be
-                    // acquired or created (otherwise dead conenctions would "fill up" the pool
-                    // while the FP pretends that the pool is healthy)
-                    _semaphore.Release();
-
                     MarkAsDead();
                     result.Fail(message);
-                    return result;
+                    return true;
+                }
+            }
+
+            private IPooledSocketResult WaitForSocket(PooledSocketResult result)
+            {
+                _sockets.EnterWait();
+                try
+                {
+                    var started = DateTime.UtcNow;
+                    while (true)
+                    {
+                        if (!_isAlive || _isDisposed)
+                        {
+                            return FailDeadOrDisposed(result);
+                        }
+
+                        if (_sockets.TryTake(out var socket))
+                        {
+                            return CompleteAcquireFromPool(result, socket);
+                        }
+
+                        if (TryCreateSocket(result, out _))
+                        {
+                            return result;
+                        }
+
+                        var remaining = _queueTimeout - (DateTime.UtcNow - started);
+                        if (remaining <= TimeSpan.Zero || !_sockets.Wait(remaining))
+                        {
+                            var message = "Pool is full, timeouting. " + _endPoint;
+                            if (_isDebugEnabled) _logger.LogDebug(message);
+                            result.Fail(message, new TimeoutException());
+                            return result;
+                        }
+                    }
+                }
+                finally
+                {
+                    _sockets.ExitWait();
+                }
+            }
+
+            private async Task<IPooledSocketResult> WaitForSocketAsync(PooledSocketResult result)
+            {
+                _sockets.EnterWait();
+                try
+                {
+                    var started = DateTime.UtcNow;
+                    while (true)
+                    {
+                        if (!_isAlive || _isDisposed)
+                        {
+                            return FailDeadOrDisposed(result);
+                        }
+
+                        if (_sockets.TryTake(out var socket))
+                        {
+                            return await CompleteAcquireFromPoolAsync(result, socket).ConfigureAwait(false);
+                        }
+
+                        if (await TryCreateSocketAsync(result).ConfigureAwait(false))
+                        {
+                            return result;
+                        }
+
+                        var remaining = _queueTimeout - (DateTime.UtcNow - started);
+                        if (remaining <= TimeSpan.Zero || !await _sockets.WaitAsync(remaining).ConfigureAwait(false))
+                        {
+                            var message = "Pool is full, timeouting. " + _endPoint;
+                            if (_isDebugEnabled) _logger.LogDebug(message);
+                            result.Fail(message, new TimeoutException());
+                            return result;
+                        }
+                    }
+                }
+                finally
+                {
+                    _sockets.ExitWait();
+                }
+            }
+
+            private void DiscardCheckedOutSocket(PooledSocket socket)
+            {
+                try
+                {
+                    socket.Destroy();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to destroy {nameof(PooledSocket)}");
                 }
 
-                if (_isDebugEnabled) _logger.LogDebug("Done.");
-
-                return result;
+                _sockets.ReleaseReservedSlot();
             }
 
             private void MarkAsDead()
@@ -708,95 +777,30 @@ namespace Enyim.Caching.Memcached
                     _logger.LogDebug("Are we alive? " + _isAlive);
                 }
 
+                if (_isDisposed)
+                {
+                    DiscardCheckedOutSocket(socket);
+                    return;
+                }
+
                 if (_isAlive)
                 {
-                    // is it still working (i.e. the server is still connected)
                     if (socket.IsAlive)
                     {
-                        try
-                        {
-                            // mark the item as free
-                            _freeItems.Push(socket);
-                        }
-                        finally
-                        {
-                            // signal the event so if someone is waiting for it can reuse this item
-                            if (_semaphore != null)
-                            {
-                                _semaphore.Release();
-                            }
-                        }
+                        _sockets.Enqueue(socket);
                     }
                     else
                     {
-                        try
-                        {
-                            // kill this item
-                            socket.Destroy();
-
-                            // mark ourselves as not working for a while
-                            MarkAsDead();
-                        }
-                        finally
-                        {
-                            // make sure to signal the Acquire so it can create a new conenction
-                            // if the failure policy keeps the pool alive
-                            if (_semaphore != null)
-                            {
-                                _semaphore.Release();
-                            }
-                        }
+                        DiscardCheckedOutSocket(socket);
+                        MarkAsDead();
                     }
                 }
                 else
                 {
-                    try
-                    {
-                        // one of our previous sockets has died, so probably all of them
-                        // are dead. so, kill the socket (this will eventually clear the pool as well)
-                        socket.Destroy();
-                    }
-                    finally
-                    {
-                        if (_semaphore != null)
-                        {
-                            _semaphore.Release();
-                        }
-                    }
+                    // one of our previous sockets has died, so probably all of them
+                    // are dead. so, kill the socket (this will eventually clear the pool as well)
+                    DiscardCheckedOutSocket(socket);
                 }
-            }
-
-            private bool TryPopPooledSocket(out PooledSocket pooledSocket)
-            {
-                if (_freeItems.TryPop(out var socket))
-                {
-                    if (_connectionIdleTimeout > TimeSpan.Zero &&
-                        socket.LastUsed < DateTime.UtcNow.Subtract(_connectionIdleTimeout))
-                    {
-                        try
-                        {
-                            if (_logger.IsEnabled(LogLevel.Information))
-                            {
-                                _logger.LogInformation("Connection idle timeout {idleTimeout} reached.", _connectionIdleTimeout);
-                            }
-
-                            socket.Destroy();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, $"Failed to destroy {nameof(PooledSocket)}");
-                        }
-
-                        pooledSocket = null;
-                        return false;
-                    }
-
-                    pooledSocket = socket;
-                    return true;
-                }
-
-                pooledSocket = null;
-                return false;
             }
 
             ~InternalPoolImpl()
@@ -819,16 +823,8 @@ namespace Enyim.Caching.Memcached
                     _isAlive = false;
                     _isDisposed = true;
 
-                    while (_freeItems.TryPop(out var socket))
-                    {
-                        try { socket.Destroy(); }
-                        catch (Exception ex) { _logger.LogError(ex, $"failed to destroy {nameof(PooledSocket)}"); }
-                    }
-
+                    _sockets.Dispose();
                     _ownerNode = null;
-                    _semaphore.Dispose();
-                    _semaphore = null;
-                    _freeItems = null;
                 }
             }
 

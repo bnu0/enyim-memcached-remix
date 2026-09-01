@@ -107,10 +107,10 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
-            var result = new TextOperationResult();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
+            var result = new TextOperationResult();
             var response = new BinaryResponse();
 
             while (response.Read(socket))
@@ -119,7 +119,9 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
                 // found the noop, quit
                 if (response.CorrelationId == _noopId)
+                {
                     return result.Pass();
+                }
 
                 string key;
 
@@ -146,10 +148,10 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
         protected internal override async ValueTask<IOperationResult> ReadResponseAsync(PooledSocket socket)
         {
-            _result = new Dictionary<string, CacheItem>();
-            Cas = new Dictionary<string, ulong>();
-            var result = new TextOperationResult();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
+            var result = new TextOperationResult();
             var response = new BinaryResponse();
 
             while (await response.ReadAsync(socket))
@@ -158,7 +160,9 @@ namespace Enyim.Caching.Memcached.Protocol.Binary
 
                 // found the noop, quit
                 if (response.CorrelationId == _noopId)
+                {
                     return result.Pass();
+                }
 
                 string key;
 

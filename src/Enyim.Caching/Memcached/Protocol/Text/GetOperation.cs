@@ -12,9 +12,12 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override System.Collections.Generic.IList<System.ArraySegment<byte>> GetBuffer()
         {
+#if NET8_0_OR_GREATER
+            return TextSocketHelper.GetCommandBufferPrefixSuffix("gets ", Key);
+#else
             var command = "gets " + Key + TextSocketHelper.CommandTerminator;
-
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)

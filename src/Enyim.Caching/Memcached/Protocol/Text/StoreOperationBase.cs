@@ -26,29 +26,54 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override System.Collections.Generic.IList<ArraySegment<byte>> GetBuffer()
         {
-            // todo adjust the size to fit a request using a fnv hashed key
-            var sb = new StringBuilder(128);
             var buffers = new List<ArraySegment<byte>>(3);
+            var data = _value.Data;
+#if NET8_0_OR_GREATER
+            ReadOnlySpan<char> commandPrefix;
 
             switch (_command)
             {
-                case StoreCommand.Add: sb.Append("add "); break;
-                case StoreCommand.Replace: sb.Append("replace "); break;
-                case StoreCommand.Set: sb.Append("set "); break;
-                case StoreCommand.Append: sb.Append("append "); break;
-                case StoreCommand.Prepend: sb.Append("prepend "); break;
-                case StoreCommand.CheckAndSet: sb.Append("cas "); break;
+                case StoreCommand.Add: commandPrefix = "add "; break;
+                case StoreCommand.Replace: commandPrefix = "replace "; break;
+                case StoreCommand.Set: commandPrefix = "set "; break;
+                case StoreCommand.Append: commandPrefix = "append "; break;
+                case StoreCommand.Prepend: commandPrefix = "prepend "; break;
+                case StoreCommand.CheckAndSet: commandPrefix = "cas "; break;
                 default: throw new MemcachedClientException(_command + " is not supported.");
             }
 
+            TextCommandBuffer.AppendStoreHeader(
+                buffers,
+                commandPrefix,
+                Key,
+                _value.Flags,
+                _expires,
+                data.Count,
+                _cas,
+                _command == StoreCommand.CheckAndSet);
+#else
+            string commandPrefix;
+
+            switch (_command)
+            {
+                case StoreCommand.Add: commandPrefix = "add "; break;
+                case StoreCommand.Replace: commandPrefix = "replace "; break;
+                case StoreCommand.Set: commandPrefix = "set "; break;
+                case StoreCommand.Append: commandPrefix = "append "; break;
+                case StoreCommand.Prepend: commandPrefix = "prepend "; break;
+                case StoreCommand.CheckAndSet: commandPrefix = "cas "; break;
+                default: throw new MemcachedClientException(_command + " is not supported.");
+            }
+
+            var sb = new StringBuilder(128);
+
+            sb.Append(commandPrefix);
             sb.Append(Key);
             sb.Append(" ");
             sb.Append(_value.Flags.ToString(CultureInfo.InvariantCulture));
             sb.Append(" ");
             sb.Append(_expires.ToString(CultureInfo.InvariantCulture));
             sb.Append(" ");
-
-            var data = _value.Data;
             sb.Append(Convert.ToString(data.Count, CultureInfo.InvariantCulture));
 
             if (_command == StoreCommand.CheckAndSet)
@@ -58,8 +83,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             }
 
             sb.Append(TextSocketHelper.CommandTerminator);
-
             TextSocketHelper.GetCommandBuffer(sb.ToString(), buffers);
+#endif
             buffers.Add(data);
             buffers.Add(StoreOperationBase._dataTerminator);
 

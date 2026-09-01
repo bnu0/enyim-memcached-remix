@@ -1,73 +1,106 @@
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 
 namespace Enyim.Caching.Memcached.Protocol.Text
 {
     internal static class GetHelper
     {
         private static readonly Enyim.Caching.ILog log = Enyim.Caching.LogManager.GetLogger(typeof(GetHelper));
+        internal static readonly byte[] EndToken = { (byte)'E', (byte)'N', (byte)'D' };
+        internal static readonly byte[] ValueToken = { (byte)'V', (byte)'A', (byte)'L', (byte)'U', (byte)'E' };
+
+        internal enum ReadItemStatus
+        {
+            End,
+            ItemRead,
+        }
 
         public static void FinishCurrent(PooledSocket socket)
         {
             string response = TextSocketHelper.ReadResponse(socket);
 
             if (String.Compare(response, "END", StringComparison.Ordinal) != 0)
+            {
                 throw new MemcachedClientException("No END was received.");
+            }
+        }
+
+        internal static void ReadItemsInto(
+            PooledSocket socket,
+            IDictionary<string, CacheItem> items,
+            IDictionary<string, ulong> cas)
+        {
+            ReadItemStatus status;
+            while ((status = ReadItemInto(socket, items, cas)) == ReadItemStatus.ItemRead)
+            {
+            }
+        }
+
+        internal static ReadItemStatus ReadItemInto(
+            PooledSocket socket,
+            IDictionary<string, CacheItem> items,
+            IDictionary<string, ulong> cas)
+        {
+            if (!TextSocketHelper.TryReadGetHeader(socket, out MemcachedGetHeader header))
+            {
+                throw new MemcachedClientException("Empty response received.");
+            }
+
+            if (header.IsEnd)
+            {
+                return ReadItemStatus.End;
+            }
+
+            byte[] allData = new byte[header.Length];
+            ReadPayloadAndEndMarker(socket, allData, header.Length);
+
+            items[header.Key] = new CacheItem(header.Flags, new ArraySegment<byte>(allData, 0, header.Length));
+            cas[header.Key] = header.Cas;
+
+            if (log.IsDebugEnabled)
+            {
+                log.DebugFormat("Received value. Data type: {0}, size: {1}.", header.Flags, header.Length);
+            }
+
+            return ReadItemStatus.ItemRead;
         }
 
         public static GetResponse ReadItem(PooledSocket socket)
         {
-            (string[] parts, int count) = TextSocketHelper.ReadResponseParts(socket);
+            if (!TextSocketHelper.TryReadGetHeader(socket, out MemcachedGetHeader header))
+            {
+                throw new MemcachedClientException("Empty response received.");
+            }
 
-            if (count == 1 && String.Compare(parts[0], "END", StringComparison.Ordinal) == 0)
+            if (header.IsEnd)
+            {
                 return null;
-
-            var totalLenth = 0;
-            foreach(var part in parts)
-            {
-                if (part != null)
-                {
-                    totalLenth += part.Length;
-                }
             }
 
-            if (totalLenth < 6 || String.Compare(parts[0], 0, "VALUE", 0, 5, StringComparison.Ordinal) != 0)
-                throw new MemcachedClientException($"No VALUE response received ({count} parts).\r\n" + string.Join(" ", parts));
+            byte[] allData = new byte[header.Length];
+            ReadPayloadAndEndMarker(socket, allData, header.Length);
 
-            ulong cas = 0;
-
-            // response is:
-            // VALUE <key> <flags> <bytes> [<cas unique>]
-            // 0     1     2       3       4
-            //
-            // cas only exists in 1.2.4+
-            //
-            if (count == 5)
-            {
-                if (!UInt64.TryParse(parts[4], out cas))
-                    throw new MemcachedClientException("Invalid CAS VALUE received.");
-
-            }
-            else if (count < 4)
-            {
-                throw new MemcachedClientException("Invalid VALUE response received: " + string.Join(" ", parts));
-            }
-
-            ushort flags = UInt16.Parse(parts[2], CultureInfo.InvariantCulture);
-            int length = Int32.Parse(parts[3], CultureInfo.InvariantCulture);
-
-            byte[] allData = new byte[length];
-            byte[] eod = new byte[2];
-
-            socket.Read(allData, 0, length);
-            socket.Read(eod, 0, 2); // data is terminated by \r\n
-
-            GetResponse retval = new GetResponse(parts[1], flags, cas, allData);
+            GetResponse retval = new GetResponse(header.Key, header.Flags, header.Cas, allData);
 
             if (log.IsDebugEnabled)
+            {
                 log.DebugFormat("Received value. Data type: {0}, size: {1}.", retval.Item.Flags, retval.Item.Data.Count);
+            }
 
             return retval;
+        }
+
+        private static void ReadPayloadAndEndMarker(PooledSocket socket, byte[] payload, int length)
+        {
+            socket.Read(payload, 0, length);
+
+            var eod = new byte[2];
+            socket.Read(eod, 0, 2);
+
+            if (eod[0] != 13 || eod[1] != 10)
+            {
+                throw new MemcachedClientException("Invalid end marker after memcached value block.");
+            }
         }
     }
 

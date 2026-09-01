@@ -21,11 +21,16 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override IList<ArraySegment<byte>> GetBuffer()
         {
+#if NET8_0_OR_GREATER
+            return string.IsNullOrEmpty(_type)
+                ? TextCommandBuffer.FromPrefixSuffix("stats", ReadOnlySpan<char>.Empty)
+                : TextSocketHelper.GetCommandBufferPrefixSuffix("stats ", _type);
+#else
             var command = string.IsNullOrEmpty(_type)
                             ? "stats" + TextSocketHelper.CommandTerminator
                             : "stats " + _type + TextSocketHelper.CommandTerminator;
-
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
