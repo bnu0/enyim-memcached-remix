@@ -44,7 +44,7 @@ namespace EnyimRedux.Caching.Memcached.Protocol.Text
         {
             if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
             {
-                throw new MemcachedClientException("Unexpected end of stream while reading memcached response.");
+                throw new MemcachedClientException("Empty response received.");
             }
 
             try
@@ -101,9 +101,12 @@ namespace EnyimRedux.Caching.Memcached.Protocol.Text
 
         public static GetResponse ReadItem(PooledSocket socket)
         {
+            // EOF is not "END": returning null here would report a dropped connection as a cache
+            // miss, because the caller cannot tell the two apart. Throw so it surfaces as a
+            // connection failure, matching ReadItemInto and the pre-Redux text protocol.
             if (!TextSocketHelper.TryReadResponseLine(socket, out MemcachedResponseLine line))
             {
-                return null;
+                throw new MemcachedClientException("Empty response received.");
             }
 
             try
