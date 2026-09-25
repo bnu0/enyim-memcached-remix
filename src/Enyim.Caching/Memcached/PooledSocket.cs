@@ -27,6 +27,9 @@ namespace Enyim.Caching.Memcached
         private NetworkStream _inputStream;
         private SslStream _sslStream;
 
+        private const int KeepAliveSeconds = 10;
+        private const int KeepAliveRetryCount = 3;
+
         private const int ReadBufferSize = 8192;
         private readonly byte[] _readBuffer = new byte[ReadBufferSize];
         private int _readBufferOffset;
@@ -42,7 +45,7 @@ namespace Enyim.Caching.Memcached
             _useIPv6 = useIPv6;
             
             var socket = new Socket(useIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            ConfigureKeepAlive(socket);
             socket.NoDelay = true;
 
             _connectionTimeout = connectionTimeout == TimeSpan.MaxValue
@@ -58,6 +61,55 @@ namespace Enyim.Caching.Memcached
 
             _socket = socket;
         }
+
+        /// <summary>
+        /// Enables TCP keep-alive with a probe schedule short enough to matter for pooled sockets.
+        /// The OS default sends its first probe after 2 hours, far longer than the idle window after
+        /// which the network path drops a connection, so a reused socket looks alive right up until
+        /// the first read returns EOF. Probing after <see cref="KeepAliveSeconds"/> of idle and again
+        /// at the same interval detects a dead peer in roughly 40 seconds instead.
+        /// </summary>
+        private static void ConfigureKeepAlive(Socket socket)
+        {
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+#if NET8_0_OR_GREATER
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveTime, KeepAliveSeconds);
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveInterval, KeepAliveSeconds);
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveRetryCount, KeepAliveRetryCount);
+#else
+            // net48 only runs on Windows, where the idle time and probe interval are set together
+            // through a single control code: on/off, idle time in ms, probe interval in ms.
+            var keepAliveValues = new byte[12];
+            BitConverter.GetBytes(1u).CopyTo(keepAliveValues, 0);
+            BitConverter.GetBytes((uint)(KeepAliveSeconds * 1000)).CopyTo(keepAliveValues, 4);
+            BitConverter.GetBytes((uint)(KeepAliveSeconds * 1000)).CopyTo(keepAliveValues, 8);
+
+            try
+            {
+                socket.IOControl(IOControlCode.KeepAliveValues, keepAliveValues, null);
+            }
+            catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException)
+            {
+                // Keep-alive stays on with the OS defaults; not worth failing socket creation over.
+            }
+#endif
+        }
+
+#if NET8_0_OR_GREATER
+        private static void TrySetKeepAliveOption(Socket socket, SocketOptionName option, int value)
+        {
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Tcp, option, value);
+            }
+            catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException)
+            {
+                // Not every platform supports every option (TcpKeepAliveRetryCount in particular);
+                // the ones that did apply still take effect.
+            }
+        }
+#endif
 
         public void Connect()
         {
