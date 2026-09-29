@@ -6,7 +6,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RootNamespace>EnyimRedux.Caching</RootNamespace>
 		<AssemblyName>EnyimMemcachedRemixRedux</AssemblyName>
-		<PackageVersion>420.0.9</PackageVersion>
+		<PackageVersion>420.0.10</PackageVersion>
 		<PackageId>EnyimMemcachedRemixRedux</PackageId>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>memcached;cache</PackageTags>
