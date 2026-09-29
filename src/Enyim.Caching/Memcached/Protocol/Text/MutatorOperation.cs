@@ -28,13 +28,21 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override IList<ArraySegment<byte>> GetBuffer()
         {
+#if NET8_0_OR_GREATER
+            var commandPrefix = _mode == MutationMode.Increment ? "incr " : "decr ";
+            return TextSocketHelper.GetCommandBufferPrefixPartSeparatorPart(
+                commandPrefix,
+                Key,
+                " ",
+                _delta.ToString(CultureInfo.InvariantCulture));
+#else
             var command = (_mode == MutationMode.Increment ? "incr " : "decr ")
                             + Key
                             + " "
                             + _delta.ToString(CultureInfo.InvariantCulture)
                             + TextSocketHelper.CommandTerminator;
-
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)

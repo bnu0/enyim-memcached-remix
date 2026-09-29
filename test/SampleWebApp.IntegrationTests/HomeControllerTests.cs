@@ -8,7 +8,9 @@ using Enyim.Caching;
 using Enyim.Caching.SampleWebApp;
 using Enyim.Caching.SampleWebApp.Controllers;
 using Enyim.Caching.SampleWebApp.Models;
+using Enyim.Caching.TestCommon;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -20,7 +22,17 @@ namespace SampleWebApp.IntegrationTests
 
         public HomeControllerTests(WebApplicationFactory<Startup> factory)
         {
-            _factory = factory;
+            _factory = factory.WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string>
+                    {
+                        ["enyimMemcached:Servers:0:Address"] = MemcachedTestHost.Hostname,
+                        ["postbodyMemcached:Servers:0:Address"] = MemcachedTestHost.Hostname
+                    });
+                });
+            });
         }
 
         [Fact]

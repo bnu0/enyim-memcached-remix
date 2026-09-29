@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Enyim.Caching.TestCommon;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Markup;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +28,10 @@ public class DistributedCacheFixture
         IServiceCollection services = new ServiceCollection();
         IConfiguration conf = new ConfigurationBuilder().
             AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["enyimMemcached:Servers:0:Address"] = MemcachedTestHost.Hostname
+            })
             .Build();
         services.AddSingleton(conf);
         services.AddLogging();

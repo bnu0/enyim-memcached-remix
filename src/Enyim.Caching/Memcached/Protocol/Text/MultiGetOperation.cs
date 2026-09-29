@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached.Results.Extensions;
@@ -10,6 +9,7 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 {
     public class MultiGetOperation : MultiItemOperation, IMultiGetOperation
     {
+        private const string CommandStr = "gets ";
         private static readonly ILog _log = LogManager.GetLogger(typeof(MultiGetOperation));
 
         private Dictionary<string, CacheItem> _result;
@@ -18,29 +18,22 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override IList<ArraySegment<byte>> GetBuffer()
         {
-            // gets key1 key2 key3 ... keyN\r\n
-
-            var command = "gets " + String.Join(" ", Keys.ToArray()) + TextSocketHelper.CommandTerminator;
-
+#if NET8_0_OR_GREATER
+            return TextSocketHelper.GetCommandBufferMultiGet(CommandStr, Keys);
+#else
+            var command = CommandStr + String.Join(" ", Keys.ToArray()) + TextSocketHelper.CommandTerminator;
             return TextSocketHelper.GetCommandBuffer(command);
+#endif
         }
 
         protected internal override IOperationResult ReadResponse(PooledSocket socket)
         {
-            var retval = new Dictionary<string, CacheItem>();
-            var cas = new Dictionary<string, ulong>();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
             try
             {
-                GetResponse r;
-
-                while ((r = GetHelper.ReadItem(socket)) != null)
-                {
-                    var key = r.Key;
-
-                    retval[key] = r.Item;
-                    cas[key] = r.CasValue;
-                }
+                GetHelper.ReadItemsInto(socket, _result, Cas);
             }
             catch (NotSupportedException)
             {
@@ -49,10 +42,8 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             catch (Exception e)
             {
                 _log.Error(e);
+                return new TextOperationResult().Fail(e.Message ?? "Failed to read multi-get response.", e);
             }
-
-            _result = retval;
-            Cas = cas;
 
             return new TextOperationResult().Pass();
         }
@@ -64,20 +55,12 @@ namespace Enyim.Caching.Memcached.Protocol.Text
 
         protected internal override ValueTask<IOperationResult> ReadResponseAsync(PooledSocket socket)
         {
-            var retval = new Dictionary<string, CacheItem>();
-            var cas = new Dictionary<string, ulong>();
+            _result = new Dictionary<string, CacheItem>(Keys.Count, StringComparer.Ordinal);
+            Cas = new Dictionary<string, ulong>(Keys.Count);
 
             try
             {
-                GetResponse r;
-
-                while ((r = GetHelper.ReadItem(socket)) != null)
-                {
-                    var key = r.Key;
-
-                    retval[key] = r.Item;
-                    cas[key] = r.CasValue;
-                }
+                GetHelper.ReadItemsInto(socket, _result, Cas);
             }
             catch (NotSupportedException)
             {
@@ -86,10 +69,9 @@ namespace Enyim.Caching.Memcached.Protocol.Text
             catch (Exception e)
             {
                 _log.Error(e);
+                return new ValueTask<IOperationResult>(
+                    new TextOperationResult().Fail(e.Message ?? "Failed to read multi-get response.", e));
             }
-
-            _result = retval;
-            Cas = cas;
 
             return new ValueTask<IOperationResult>(new TextOperationResult().Pass());
         }

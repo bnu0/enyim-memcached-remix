@@ -1,4 +1,5 @@
 ﻿using Enyim.Caching.Configuration;
+using Enyim.Caching.TestCommon;
 using Enyim.Caching.Memcached;
 using Enyim.Caching.Memcached.Results;
 using Enyim.Caching.Memcached.Transcoders;
@@ -23,7 +24,7 @@ namespace Enyim.Caching.Tests
             IServiceCollection services = new ServiceCollection();
             services.AddEnyimMemcached(options =>
             {
-                options.AddServer("memcached", 11211);
+                options.AddServer(MemcachedTestHost.Hostname, 11211);
                 onAddEnyimMemcached?.Invoke(options);
                 options.Transcoder = nameof(MessagePackTranscoder);
             });

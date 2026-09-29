@@ -15,7 +15,7 @@ namespace Enyim.Caching
     /// <summary>
     /// Memcached client.
     /// </summary>
-    public partial class MemcachedClient : IMemcachedClient, IMemcachedResultsClient
+    public partial class MemcachedClient : IMemcachedClient, IMemcachedResultsClient, Microsoft.Extensions.Caching.Distributed.IDistributedCache
     {
         /// <summary>
         /// Represents a value which indicates that an item should never expire.

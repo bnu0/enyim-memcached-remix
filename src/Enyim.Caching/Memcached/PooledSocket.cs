@@ -27,10 +27,14 @@ namespace Enyim.Caching.Memcached
         private NetworkStream _inputStream;
         private SslStream _sslStream;
 
-        private const int ReadBufferSize = 512;
+        private const int KeepAliveSeconds = 10;
+        private const int KeepAliveRetryCount = 3;
+
+        private const int ReadBufferSize = 8192;
         private readonly byte[] _readBuffer = new byte[ReadBufferSize];
         private int _readBufferOffset;
         private int _readBufferCount;
+        private bool _lineReaderPendingCr;
 
         public PooledSocket(EndPoint endpoint, TimeSpan connectionTimeout, TimeSpan receiveTimeout, ILogger logger, bool useSslStream, bool useIPv6)
         {
@@ -41,7 +45,7 @@ namespace Enyim.Caching.Memcached
             _useIPv6 = useIPv6;
             
             var socket = new Socket(useIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            ConfigureKeepAlive(socket);
             socket.NoDelay = true;
 
             _connectionTimeout = connectionTimeout == TimeSpan.MaxValue
@@ -57,6 +61,55 @@ namespace Enyim.Caching.Memcached
 
             _socket = socket;
         }
+
+        /// <summary>
+        /// Enables TCP keep-alive with a probe schedule short enough to matter for pooled sockets.
+        /// The OS default sends its first probe after 2 hours, far longer than the idle window after
+        /// which the network path drops a connection, so a reused socket looks alive right up until
+        /// the first read returns EOF. Probing after <see cref="KeepAliveSeconds"/> of idle and again
+        /// at the same interval detects a dead peer in roughly 40 seconds instead.
+        /// </summary>
+        private static void ConfigureKeepAlive(Socket socket)
+        {
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+#if NET8_0_OR_GREATER
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveTime, KeepAliveSeconds);
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveInterval, KeepAliveSeconds);
+            TrySetKeepAliveOption(socket, SocketOptionName.TcpKeepAliveRetryCount, KeepAliveRetryCount);
+#else
+            // net48 only runs on Windows, where the idle time and probe interval are set together
+            // through a single control code: on/off, idle time in ms, probe interval in ms.
+            var keepAliveValues = new byte[12];
+            BitConverter.GetBytes(1u).CopyTo(keepAliveValues, 0);
+            BitConverter.GetBytes((uint)(KeepAliveSeconds * 1000)).CopyTo(keepAliveValues, 4);
+            BitConverter.GetBytes((uint)(KeepAliveSeconds * 1000)).CopyTo(keepAliveValues, 8);
+
+            try
+            {
+                socket.IOControl(IOControlCode.KeepAliveValues, keepAliveValues, null);
+            }
+            catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException)
+            {
+                // Keep-alive stays on with the OS defaults; not worth failing socket creation over.
+            }
+#endif
+        }
+
+#if NET8_0_OR_GREATER
+        private static void TrySetKeepAliveOption(Socket socket, SocketOptionName option, int value)
+        {
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Tcp, option, value);
+            }
+            catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException)
+            {
+                // Not every platform supports every option (TcpKeepAliveRetryCount in particular);
+                // the ones that did apply still take effect.
+            }
+        }
+#endif
 
         public void Connect()
         {
@@ -193,6 +246,7 @@ namespace Enyim.Caching.Memcached
         {
             _readBufferOffset = 0;
             _readBufferCount = 0;
+            _lineReaderPendingCr = false;
 
             int available = _socket.Available;
 
@@ -216,6 +270,7 @@ namespace Enyim.Caching.Memcached
         {
             _readBufferOffset = 0;
             _readBufferCount = 0;
+            _lineReaderPendingCr = false;
 
             int available = _socket.Available;
 
@@ -331,17 +386,9 @@ namespace Enyim.Caching.Memcached
 
             try
             {
-                if (_readBufferCount == 0)
+                if (_readBufferCount == 0 && !FillReadBuffer())
                 {
-                    var stream = _useSslStream ? (Stream)_sslStream : _inputStream;
-                    int bytesRead = stream.Read(_readBuffer, 0, ReadBufferSize);
-                    if (bytesRead == 0)
-                    {
-                        return -1;
-                    }
-
-                    _readBufferOffset = 0;
-                    _readBufferCount = bytesRead;
+                    return -1;
                 }
 
                 _readBufferCount--;
@@ -356,6 +403,121 @@ namespace Enyim.Caching.Memcached
 
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Reads bytes up to but not including the next CRLF into <paramref name="dest"/>.
+        /// </summary>
+        /// <param name="truncated">
+        /// True when <paramref name="dest"/> filled before CRLF. Continue with a larger buffer
+        /// starting at <paramref name="bytesWritten"/>. A pending CR at the end of a socket fill
+        /// is not written to <paramref name="dest"/>.
+        /// </param>
+        /// <returns>False on EOF / half-open; the socket is marked dead.</returns>
+        public bool TryReadCrlfLine(Span<byte> dest, out int bytesWritten, out bool truncated)
+        {
+            CheckDisposed();
+            bytesWritten = 0;
+            truncated = false;
+
+            try
+            {
+                if (!_lineReaderPendingCr && _readBufferCount > 0 && dest.Length > 0)
+                {
+                    var available = _readBuffer.AsSpan(_readBufferOffset, _readBufferCount);
+                    int cr = available.IndexOf((byte)'\r');
+                    if (cr >= 0 && cr + 1 < available.Length && available[cr + 1] == (byte)'\n' && cr <= dest.Length)
+                    {
+                        available.Slice(0, cr).CopyTo(dest);
+                        bytesWritten = cr;
+                        int consume = cr + 2;
+                        _readBufferOffset += consume;
+                        _readBufferCount -= consume;
+                        return true;
+                    }
+                }
+
+                while (bytesWritten < dest.Length)
+                {
+                    if (_readBufferCount == 0 && !FillReadBuffer())
+                    {
+                        _isAlive = false;
+                        return false;
+                    }
+
+                    byte b = _readBuffer[_readBufferOffset++];
+                    _readBufferCount--;
+
+                    if (_lineReaderPendingCr)
+                    {
+                        _lineReaderPendingCr = false;
+                        if (b == (byte)'\n')
+                        {
+                            return true;
+                        }
+
+                        dest[bytesWritten++] = (byte)'\r';
+                        if (bytesWritten == dest.Length)
+                        {
+                            _readBufferOffset--;
+                            _readBufferCount++;
+                            truncated = true;
+                            return true;
+                        }
+                    }
+
+                    if (b == (byte)'\r')
+                    {
+                        _lineReaderPendingCr = true;
+                        continue;
+                    }
+
+                    dest[bytesWritten++] = b;
+                }
+
+                if (_lineReaderPendingCr)
+                {
+                    if (_readBufferCount == 0 && !FillReadBuffer())
+                    {
+                        _isAlive = false;
+                        return false;
+                    }
+
+                    if (_readBufferCount > 0 && _readBuffer[_readBufferOffset] == (byte)'\n')
+                    {
+                        _readBufferOffset++;
+                        _readBufferCount--;
+                        _lineReaderPendingCr = false;
+                        return true;
+                    }
+                }
+
+                truncated = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (ex is IOException || ex is SocketException)
+                {
+                    _isAlive = false;
+                }
+
+                throw;
+            }
+        }
+
+        private bool FillReadBuffer()
+        {
+            var stream = _useSslStream ? (Stream)_sslStream : _inputStream;
+            int bytesRead = stream.Read(_readBuffer, 0, ReadBufferSize);
+            if (bytesRead <= 0)
+            {
+                return false;
+            }
+
+            _readBufferOffset = 0;
+            _readBufferCount = bytesRead;
+            return true;
         }
 
         public int ReadByteAsync()

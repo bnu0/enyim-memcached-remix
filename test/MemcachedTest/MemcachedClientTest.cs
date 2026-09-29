@@ -1,3 +1,4 @@
+using Enyim.Caching.TestCommon;
 using Enyim.Caching;
 using Enyim.Caching.Memcached;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,7 +22,7 @@ namespace MemcachedTest
             IServiceCollection services = new ServiceCollection();
             services.AddEnyimMemcached(options =>
             {
-                options.AddServer("memcached", 11211);
+                options.AddServer(MemcachedTestHost.Hostname, 11211);
                 options.Protocol = protocol;
                 // options.Transcoder = "MessagePackTranscoder";
             });
@@ -339,11 +340,12 @@ namespace MemcachedTest
         public void IncrementLongTest()
         {
             var initialValue = 56UL * (ulong)Math.Pow(10, 11) + 1234;
+            var key = "increment_long_" + Guid.NewGuid();
 
             using (MemcachedClient client = GetClient())
             {
-                Assert.Equal(initialValue, client.Increment("VALUE", initialValue, 2UL));
-                Assert.Equal(initialValue + 24, client.Increment("VALUE", 10UL, 24UL));
+                Assert.Equal(initialValue, client.Increment(key, initialValue, 2UL));
+                Assert.Equal(initialValue + 24, client.Increment(key, 10UL, 24UL));
             }
         }
 

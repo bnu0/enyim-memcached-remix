@@ -1,4 +1,5 @@
-﻿using Enyim.Caching;
+﻿using Enyim.Caching.TestCommon;
+using Enyim.Caching;
 using Enyim.Caching.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,7 @@ namespace MemcachedTest
             var idleTimeout = TimeSpan.FromSeconds(2);
             services.AddEnyimMemcached(options =>
             {
-                options.AddServer("memcached", 11211);
+                options.AddServer(MemcachedTestHost.Hostname, 11211);
                 options.SocketPool = new SocketPoolOptions
                 {
                     ConnectionIdleTimeout = idleTimeout
@@ -43,6 +44,37 @@ namespace MemcachedTest
             Assert.Contains(logMessage, sw.ToString());
 
             Console.SetOut(originConsoleOut);
+        }
+
+        [Fact]
+        public async Task ConcurrentGets_WithSmallPool_DoNotExceedMaxPoolSize()
+        {
+            IServiceCollection services = new ServiceCollection();
+            services.AddEnyimMemcached(options =>
+            {
+                options.AddServer(MemcachedTestHost.Hostname, 11211);
+                options.SocketPool = new SocketPoolOptions
+                {
+                    MinPoolSize = 0,
+                    MaxPoolSize = 4,
+                    QueueTimeout = TimeSpan.FromSeconds(5)
+                };
+            });
+            services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
+            IServiceProvider sp = services.BuildServiceProvider();
+            var client = sp.GetRequiredService<IMemcachedClient>();
+
+            var key = Guid.NewGuid().ToString();
+            Assert.True(await client.SetAsync(key, "v", 60));
+
+            var tasks = Enumerable.Range(0, 64).Select(_ => client.GetAsync<string>(key));
+            var results = await Task.WhenAll(tasks);
+
+            Assert.All(results, r =>
+            {
+                Assert.True(r.Success);
+                Assert.Equal("v", r.Value);
+            });
         }
     }
 }

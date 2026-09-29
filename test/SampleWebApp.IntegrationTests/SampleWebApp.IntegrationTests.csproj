@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Common\MemcachedTestHost.cs" Link="MemcachedTestHost.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Enyim.Caching\Enyim.Caching.csproj" />
     <ProjectReference Include="..\..\sample\SampleWebApp\SampleWebApp.csproj" />
   </ItemGroup>

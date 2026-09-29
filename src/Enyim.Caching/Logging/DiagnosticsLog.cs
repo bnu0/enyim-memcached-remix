@@ -90,7 +90,7 @@ namespace Enyim.Caching
 
         bool ILog.IsDebugEnabled
         {
-            get { return true; }
+            get { return false; }
         }
 
         bool ILog.IsInfoEnabled

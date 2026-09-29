@@ -167,6 +167,30 @@ namespace Enyim
     {
         public FNV1a(bool initialize) : base(initialize) { }
 
+        public static uint Hash(ReadOnlySpan<byte> data)
+        {
+            uint hash = Init;
+            for (int i = 0; i < data.Length; i++)
+            {
+                hash ^= data[i];
+                hash *= Prime;
+            }
+
+            return hash;
+        }
+
+        public static uint HashAscii(ReadOnlySpan<char> data)
+        {
+            uint hash = Init;
+            for (int i = 0; i < data.Length; i++)
+            {
+                hash ^= data[i];
+                hash *= Prime;
+            }
+
+            return hash;
+        }
+
         /// <summary>Routes data written to the object into the <see cref="T:FNV1a" /> hash algorithm for computing the hash.</summary>
         /// <param name="array">The input data. </param>
         /// <param name="ibStart">The offset into the byte array from which to begin using data. </param>
